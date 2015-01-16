@@ -1,0 +1,4 @@
+[root]
+name = "regex_dfa"
+version = "0.0.1"
+
