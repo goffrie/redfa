@@ -106,7 +106,7 @@ impl Regex {
                 }
             }
             And(xs) => {
-                let mut xs: BTreeSet<Regex> = xs.into_iter().map(Regex::simplify).pull(|&: x| match x {
+                let mut xs: BTreeSet<Regex> = xs.into_iter().map(Regex::simplify).pull(|x| match x {
                     And(v) => Ok(v),
                     x => Err(x)
                 }).collect();
@@ -129,7 +129,7 @@ impl Regex {
             }
             Cat(xs) => {
                 let mut killed = false;
-                let mut xs: Vec<_> = xs.into_iter().map(Regex::simplify).pull(|&: x| match x {
+                let mut xs: Vec<_> = xs.into_iter().map(Regex::simplify).pull(|x| match x {
                     Cat(v) => Ok(v),
                     x => Err(x)
                 }).filter(|&mut: x| match *x {
@@ -502,10 +502,10 @@ impl CharSet {
         use self::CharSet::{Just, Not};
         match *self {
             Just(ref a) => {
-                Just(inter(a.iter().map(|&: x| *x), b.iter().map(|&: x| *x)).collect())
+                Just(inter(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
             }
             Not(ref a) => {
-                Just(subtract(b.iter().map(|&: x| *x), a.iter().map(|&: x| *x)).collect())
+                Just(subtract(b.iter().map(|x| *x), a.iter().map(|x| *x)).collect())
             }
         }
     }
@@ -513,10 +513,10 @@ impl CharSet {
         use self::CharSet::{Just, Not};
         match *self {
             Just(ref a) => {
-                Just(subtract(a.iter().map(|&: x| *x), b.iter().map(|&: x| *x)).collect())
+                Just(subtract(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
             }
             Not(ref a) => {
-                Not(union(a.iter().map(|&: x| *x), b.iter().map(|&: x| *x)).collect())
+                Not(union(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
             }
         }
     }
@@ -545,7 +545,7 @@ fn combine<F: Fn(&[&Regex]) -> Regex>(v: &[Derivatives], f: F) -> Derivatives {
         let first = &first[0];
         let mut all_chars = Vec::new();
         for &(ref chars, ref reg) in first.d.iter() {
-            all_chars = union(all_chars.into_iter(), chars.iter().map(|&: x| *x)).collect();
+            all_chars = union(all_chars.into_iter(), chars.iter().map(|x| *x)).collect();
             let inter = what.inter(&chars[]);
             res.push(reg);
             go(rest, f, inter, res, out);
@@ -596,17 +596,17 @@ impl Regex {
                     ds.push(Derivatives { d: vec![(cs.clone(), Empty)], rest: Null });
                 }
                 ds.extend(xs.iter().map(Regex::derivative));
-                combine(&ds[], |&: regexes| Alt(Vec::new(), regexes.iter().map(|&: r| (*r).clone()).collect()))
+                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
             }
             And(ref xs) => {
                 let ds: Vec<_> = xs.iter().map(Regex::derivative).collect();
-                combine(&ds[], |&: regexes| And(regexes.iter().map(|&: r| (*r).clone()).collect()))
+                combine(&ds[], |regexes| And(regexes.iter().map(|r| (*r).clone()).collect()))
             }
-            Not(box ref x) => x.derivative().map(|&: r| Not(box r)),
+            Not(box ref x) => x.derivative().map(|r| Not(box r)),
             Cat(ref xs) => {
                 let mut ds = Vec::new();
                 for i in 0..xs.len() {
-                    ds.push(xs[i].derivative().map(|&: r| {
+                    ds.push(xs[i].derivative().map(|r| {
                         let mut v = vec![r];
                         v.push_all(xs.slice_from(i+1));
                         Cat(v)
@@ -615,9 +615,9 @@ impl Regex {
                         break;
                     }
                 }
-                combine(&ds[], |&: regexes| Alt(Vec::new(), regexes.iter().map(|&: r| (*r).clone()).collect()))
+                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
             }
-            Kleene(box ref x) => x.derivative().map(|&: r| Cat(vec![r, Kleene(box x.clone())])),
+            Kleene(box ref x) => x.derivative().map(|r| Cat(vec![r, Kleene(box x.clone())])),
         }
     }
 }
