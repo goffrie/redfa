@@ -6,4 +6,5 @@
 pub use regex::Regex;
 pub use dfa::{Transition, Dfa};
 pub mod regex;
+pub mod derivatives;
 pub mod dfa;

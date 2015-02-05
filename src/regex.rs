@@ -1,8 +1,8 @@
-use std::{vec, char, mem};
+use std::{vec, char};
 use std::collections::BTreeSet;
 use std::iter::{self, Peekable};
-use std::cmp::Ordering;
 use self::Regex::*;
+use dfa::Normalize;
 
 #[derive(PartialOrd,Ord,PartialEq,Eq,Show,Clone)]
 pub enum Regex {
@@ -69,8 +69,8 @@ impl<A, Fun: FnMut(A) -> Result<Vec<A>, A>, Iter: Iterator<Item=A>> Iterator for
     }
 }
 
-impl Regex {
-    pub fn simplify(self) -> Regex {
+impl Normalize for Regex {
+    fn normalize(self) -> Regex {
         let not_null = Not(box Null); // FIXME: allocation here ;_;
         match self {
             Null => Null,
@@ -81,7 +81,7 @@ impl Regex {
                 for c in a.into_iter() {
                     chars.insert(c);
                 }
-                let mut xs = xs.into_iter().map(Regex::simplify).pull(|&mut: x| match x {
+                let mut xs = xs.into_iter().map(Normalize::normalize).pull(|&mut: x| match x {
                     Alt(cs, v) => {
                         for c in cs.into_iter() {
                             chars.insert(c);
@@ -106,7 +106,7 @@ impl Regex {
                 }
             }
             And(xs) => {
-                let mut xs: BTreeSet<Regex> = xs.into_iter().map(Regex::simplify).pull(|x| match x {
+                let mut xs: BTreeSet<Regex> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     And(v) => Ok(v),
                     x => Err(x)
                 }).collect();
@@ -122,14 +122,14 @@ impl Regex {
                 }
             }
             Not(box x) => {
-                match x.simplify() {
+                match x.normalize() {
                     Not(box y) => y,
                     y => Not(box y)
                 }
             }
             Cat(xs) => {
                 let mut killed = false;
-                let mut xs: Vec<_> = xs.into_iter().map(Regex::simplify).pull(|x| match x {
+                let mut xs: Vec<_> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     Cat(v) => Ok(v),
                     x => Err(x)
                 }).filter(|&mut: x| match *x {
@@ -150,7 +150,7 @@ impl Regex {
                 }
             }
             Kleene(box x) => {
-                match x.simplify() {
+                match x.normalize() {
                     Kleene(y) => Kleene(y),
                     Null => Empty,
                     Empty => Empty,
@@ -371,200 +371,6 @@ impl Regex {
     }
 }
 
-#[derive(Show,Clone)]
-pub struct Derivatives {
-    pub d: Vec<(Vec<char>, Regex)>,
-    pub rest: Regex,
-}
-
-impl Derivatives {
-    pub fn map<F: FnMut(Regex) -> Regex>(mut self, mut f: F) -> Derivatives {
-        for &mut (_, ref mut r) in self.d.iter_mut() {
-            // have to swap something in in the meantime
-            let v = mem::replace(r, Null);
-            *r = f(v);
-        }
-        self.rest = f(self.rest);
-        self
-    }
-}
-
-struct Union<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
-}
-fn union<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Union<T, It1, It2> {
-    Union { a: a.peekable(), b: b.peekable() }
-}
-impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Union<T, It1, It2> {
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
-        match match self.a.peek() {
-            Some(av) => match self.b.peek() {
-                Some(bv) => av.cmp(bv),
-                None => Ordering::Less,
-            },
-            None => Ordering::Greater,
-        } {
-            Ordering::Less => {
-                self.a.next()
-            }
-            Ordering::Greater => {
-                self.b.next()
-            }
-            Ordering::Equal => {
-                self.a.next();
-                self.b.next()
-            }
-        }
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (a1, a2) = self.a.size_hint();
-        let (b1, b2) = self.b.size_hint();
-        (a1 + b1,
-         if let (Some(a2), Some(b2)) = (a2, b2) {
-             Some(a2 + b2)
-         } else {
-             None
-         })
-    }
-}
-
-struct Inter<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
-}
-fn inter<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Inter<T, It1, It2> {
-    Inter { a: a.peekable(), b: b.peekable() }
-}
-impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Inter<T, It1, It2> {
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
-        loop {
-            match if let (Some(av), Some(bv)) = (self.a.peek(), self.b.peek()) {
-                av.cmp(bv)
-            } else {
-                return None
-            } {
-                Ordering::Less => {
-                    self.a.next();
-                }
-                Ordering::Greater => {
-                    self.b.next();
-                }
-                Ordering::Equal => {
-                    self.a.next();
-                    return self.b.next();
-                }
-            }
-        }
-    }
-}
-
-struct Subtract<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
-}
-fn subtract<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Subtract<T, It1, It2> {
-    Subtract { a: a.peekable(), b: b.peekable() }
-}
-impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Subtract<T, It1, It2> {
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
-        loop {
-            match match (self.a.peek(), self.b.peek()) {
-                (Some(av), Some(bv)) => av.cmp(bv),
-                (_, None) => Ordering::Less,
-                (None, _) => return None,
-            } {
-                Ordering::Less => {
-                    return self.a.next();
-                }
-                Ordering::Greater => {
-                    self.b.next();
-                }
-                Ordering::Equal => {
-                    self.a.next();
-                    self.b.next();
-                }
-            }
-        }
-    }
-}
-
-enum CharSet {
-    Just(Vec<char>),
-    Not(Vec<char>),
-}
-
-impl CharSet {
-    fn inter(&self, b: &[char]) -> CharSet {
-        use self::CharSet::{Just, Not};
-        match *self {
-            Just(ref a) => {
-                Just(inter(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
-            }
-            Not(ref a) => {
-                Just(subtract(b.iter().map(|x| *x), a.iter().map(|x| *x)).collect())
-            }
-        }
-    }
-    fn subtract(&self, b: &[char]) -> CharSet {
-        use self::CharSet::{Just, Not};
-        match *self {
-            Just(ref a) => {
-                Just(subtract(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
-            }
-            Not(ref a) => {
-                Not(union(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
-            }
-        }
-    }
-}
-
-fn combine<F: Fn(&[&Regex]) -> Regex>(v: &[Derivatives], f: F) -> Derivatives {
-    fn go<'a, 'b, 'd, F: Fn(&[&Regex]) -> Regex>(v: &'a [Derivatives], f: &F, what: CharSet, res: &'b mut Vec<&'a Regex>, out: &'d mut Derivatives) {
-        if let CharSet::Just(ref v) = what {
-            if v.len() == 0 {
-                // prune
-                return;
-            }
-        }
-        if v.len() == 0 {
-            let reg = f(&res[]);
-            match what {
-                CharSet::Just(c) => out.d.push((c, reg)),
-                CharSet::Not(_) => {
-                    assert!(out.rest == Null);
-                    out.rest = reg;
-                }
-            }
-            return;
-        }
-        let (first, rest) = v.split_at(1);
-        let first = &first[0];
-        let mut all_chars = Vec::new();
-        for &(ref chars, ref reg) in first.d.iter() {
-            all_chars = union(all_chars.into_iter(), chars.iter().map(|x| *x)).collect();
-            let inter = what.inter(&chars[]);
-            res.push(reg);
-            go(rest, f, inter, res, out);
-            res.pop();
-        }
-        let inter = what.subtract(&all_chars[]);
-        res.push(&first.rest);
-        go(rest, f, inter, res, out);
-        res.pop();
-    }
-    let mut result = Derivatives {
-        d: Vec::new(),
-        rest: Null // FIXME: Would prefer a slightly better init value than this
-    };
-    let mut regexes = Vec::new();
-    go(v, &f, CharSet::Not(Vec::new()), &mut regexes, &mut result);
-    result
-}
-
 impl Regex {
     // FIXME: This could be inefficient. Try to cache it in the data structure
     pub fn nullable(&self) -> bool {
@@ -577,47 +383,6 @@ impl Regex {
             Not(ref x) => !x.nullable(),
             Cat(ref xs) => xs.iter().all(Regex::nullable),
             Kleene(_) => true,
-        }
-    }
-    pub fn derivative(&self) -> Derivatives {
-        match *self {
-            Null => Derivatives { d: Vec::new(), rest: Null },
-            Empty => Derivatives { d: Vec::new(), rest: Null },
-            Except(ref cs) => {
-                if cs.len() == 0 {
-                    Derivatives { d: Vec::new(), rest: Empty }
-                } else {
-                    Derivatives { d: vec![(cs.clone(), Null)], rest: Empty }
-                }
-            }
-            Alt(ref cs, ref xs) => {
-                let mut ds = Vec::with_capacity(if cs.len() > 0 { 1 } else { 0 } + xs.len());
-                if cs.len() > 0 {
-                    ds.push(Derivatives { d: vec![(cs.clone(), Empty)], rest: Null });
-                }
-                ds.extend(xs.iter().map(Regex::derivative));
-                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
-            }
-            And(ref xs) => {
-                let ds: Vec<_> = xs.iter().map(Regex::derivative).collect();
-                combine(&ds[], |regexes| And(regexes.iter().map(|r| (*r).clone()).collect()))
-            }
-            Not(box ref x) => x.derivative().map(|r| Not(box r)),
-            Cat(ref xs) => {
-                let mut ds = Vec::new();
-                for i in 0..xs.len() {
-                    ds.push(xs[i].derivative().map(|r| {
-                        let mut v = vec![r];
-                        v.push_all(xs.slice_from(i+1));
-                        Cat(v)
-                    }));
-                    if !xs[i].nullable() {
-                        break;
-                    }
-                }
-                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
-            }
-            Kleene(box ref x) => x.derivative().map(|r| Cat(vec![r, Kleene(box x.clone())])),
         }
     }
 }
