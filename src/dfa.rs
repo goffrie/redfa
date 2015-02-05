@@ -17,6 +17,12 @@ pub trait Normalize {
     fn normalize(self) -> Self;
 }
 
+impl<R: Normalize> Normalize for Vec<R> {
+    fn normalize(self) -> Self {
+        self.map_in_place(Normalize::normalize)
+    }
+}
+
 impl Dfa {
     pub fn from_derivatives<R: Differentiable + Normalize + Ord + Clone>(initial: Vec<R>) -> (Dfa, BTreeMap<R, u32>) {
         fn index<R: Ord + Clone>(worklist: &mut (BTreeMap<R, u32>, RingBuf<R>), re: R) -> u32 {
