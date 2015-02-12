@@ -172,6 +172,7 @@ Atom : Char
      : '[' Chars ']'
 Kleene : Atom
        : Kleene '*'
+       : Kleene '+'
 Cat : Kleene
     : Kleene Cat
 Not : Cat
@@ -212,8 +213,8 @@ impl Regex {
             c != '~' && c != '|' && c != '&'
                 && c != '[' && c != ']'
                 && c != '(' && c != ')'
-                && c != '*' && c != '~'
-                && c != '.'
+                && c != '*' && c != '+'
+                && c != '~' && c != '.'
         }
         fn char_group(c: char) -> bool {
             c != ']'
@@ -297,6 +298,10 @@ impl Regex {
                         it.next();
                         r = Kleene(box r)
                     }
+                    Some(&'+') => {
+                        it.next();
+                        r = Cat(vec![r.clone(), Kleene(box r)])
+                    }
                     _ => break,
                 }
             }
@@ -315,9 +320,6 @@ impl Regex {
             }
             Ok(Cat(r))
         }
-        fn cat_first(c: char) -> bool {
-            kleene_first(c) || c == '&' || c == '|' || c == ')'
-        }
         fn not<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
             match it.peek() {
                 Some(&'~') => {
@@ -328,9 +330,6 @@ impl Regex {
                     cat(it)
                 }
             }
-        }
-        fn not_first(c: char) -> bool {
-            c == '~' || cat_first(c)
         }
         fn and<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
             let mut r = vec![try!(not(it))];
