@@ -1,4 +1,3 @@
-use std::ptr;
 use std::iter::Peekable;
 use std::cmp::Ordering;
 use regex::Regex::*;
@@ -11,15 +10,11 @@ pub struct Derivatives<R> {
 }
 
 impl<R> Derivatives<R> {
-    pub fn map<F: FnMut(R) -> R>(mut self, mut f: F) -> Derivatives<R> {
-        for &mut (_, ref mut r) in self.d.iter_mut() {
-            // umm... let's hope no panics happen
-            unsafe {
-                ptr::write(r, f(ptr::read_and_zero(r)));
-            }
+    pub fn map<F: FnMut(R) -> R>(self, mut f: F) -> Derivatives<R> {
+        Derivatives {
+            d: self.d.map_in_place(|(x, r)| (x, f(r))),
+            rest: f(self.rest),
         }
-        self.rest = f(self.rest);
-        self
     }
 }
 
