@@ -4,7 +4,7 @@ use std::iter::{self, Peekable};
 use self::Regex::*;
 use dfa::Normalize;
 
-#[derive(PartialOrd,Ord,PartialEq,Eq,Show,Clone)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
 pub enum Regex {
     Null, // the null set (never matches)
     Empty, // the empty string (matches exactly "")
@@ -81,7 +81,7 @@ impl Normalize for Regex {
                 for c in a.into_iter() {
                     chars.insert(c);
                 }
-                let mut xs = xs.into_iter().map(Normalize::normalize).pull(|&mut: x| match x {
+                let mut xs = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     Alt(cs, v) => {
                         for c in cs.into_iter() {
                             chars.insert(c);
@@ -132,7 +132,7 @@ impl Normalize for Regex {
                 let mut xs: Vec<_> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     Cat(v) => Ok(v),
                     x => Err(x)
-                }).filter(|&mut: x| match *x {
+                }).filter(|x| match *x {
                     Null => {
                         killed = true;
                         false
@@ -182,13 +182,13 @@ And : Not
 Alt : And
     : And '|' Alt
 */
-#[derive(Copy,Show)]
+#[derive(Copy, Clone, Debug)]
 pub enum ParseError {
     UnexpectedEof(&'static str),
     UnexpectedChar(&'static str, char),
     BadRange(&'static str, char, char),
 }
-type Pk<I> = Peekable<char, I>;
+type Pk<I> = Peekable<I>;
 type Res = Result<Regex, ParseError>;
 impl Regex {
     fn parse<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {

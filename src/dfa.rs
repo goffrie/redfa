@@ -1,14 +1,14 @@
 use derivatives::Differentiable;
-use std::collections::{BTreeMap, RingBuf};
+use std::collections::{BTreeMap, VecDeque};
 use std::collections::btree_map::{Entry};
 
-#[derive(Show, Clone)]
+#[derive(Debug, Clone)]
 pub struct Transition {
     pub by_char: BTreeMap<char, u32>,
     pub default: u32,
 }
 
-#[derive(Show, Clone)]
+#[derive(Debug, Clone)]
 pub struct Dfa {
     pub transitions: Vec<Transition>,
 }
@@ -25,7 +25,7 @@ impl<R: Normalize> Normalize for Vec<R> {
 
 impl Dfa {
     pub fn from_derivatives<R: Differentiable + Normalize + Ord + Clone>(initial: Vec<R>) -> (Dfa, BTreeMap<R, u32>) {
-        fn index<R: Ord + Clone>(worklist: &mut (BTreeMap<R, u32>, RingBuf<R>), re: R) -> u32 {
+        fn index<R: Ord + Clone>(worklist: &mut (BTreeMap<R, u32>, VecDeque<R>), re: R) -> u32 {
             let next_index = worklist.0.len() as u32;
             match worklist.0.entry(re.clone()) { // FIXME: unnecessary allocation
                 Entry::Vacant(view) => {
@@ -40,7 +40,7 @@ impl Dfa {
         }
 
         let mut result = Dfa { transitions: Vec::new() };
-        let mut worklist = (BTreeMap::new(), RingBuf::new());
+        let mut worklist = (BTreeMap::new(), VecDeque::new());
 
         for r in initial.into_iter() {
             index(&mut worklist, r.normalize());

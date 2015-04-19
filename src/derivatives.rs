@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use regex::Regex::*;
 use regex::Regex;
 
-#[derive(Show,Clone)]
+#[derive(Debug,Clone)]
 pub struct Derivatives<R> {
     pub d: Vec<(Vec<char>, R)>,
     pub rest: R,
@@ -23,8 +23,8 @@ pub trait Differentiable {
 }
 
 struct Union<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
+    a : Peekable<It1>,
+    b : Peekable<It2>,
 }
 fn union<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Union<T, It1, It2> {
     Union { a: a.peekable(), b: b.peekable() }
@@ -64,8 +64,8 @@ impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Union<T,
 }
 
 struct Inter<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
+    a : Peekable<It1>,
+    b : Peekable<It2>,
 }
 fn inter<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Inter<T, It1, It2> {
     Inter { a: a.peekable(), b: b.peekable() }
@@ -95,8 +95,8 @@ impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Inter<T,
 }
 
 struct Subtract<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
-    a : Peekable<T, It1>,
-    b : Peekable<T, It2>,
+    a : Peekable<It1>,
+    b : Peekable<It2>,
 }
 fn subtract<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>>(a: It1, b: It2) -> Subtract<T, It1, It2> {
     Subtract { a: a.peekable(), b: b.peekable() }
@@ -170,7 +170,7 @@ fn combine<R, S, F: FnMut(&[&R]) -> S>(v: &[Derivatives<R>], mut f: F) -> Deriva
             }
         }
         if v.len() == 0 {
-            let reg = f(&res[]);
+            let reg = f(&res);
             match what {
                 CharSet::Just(c) => out.0.push((c, reg)),
                 CharSet::Not(_) => {
@@ -185,12 +185,12 @@ fn combine<R, S, F: FnMut(&[&R]) -> S>(v: &[Derivatives<R>], mut f: F) -> Deriva
         let mut all_chars = Vec::new();
         for &(ref chars, ref reg) in first.d.iter() {
             all_chars = union(all_chars.into_iter(), chars.iter().map(|x| *x)).collect();
-            let inter = what.inter(&chars[]);
+            let inter = what.inter(&chars);
             res.push(reg);
             go(rest, f, inter, res, out);
             res.pop();
         }
-        let inter = what.subtract(&all_chars[]);
+        let inter = what.subtract(&all_chars);
         res.push(&first.rest);
         go(rest, f, inter, res, out);
         res.pop();
@@ -222,11 +222,11 @@ impl Differentiable for Regex {
                     ds.push(Derivatives { d: vec![(cs.clone(), Empty)], rest: Null });
                 }
                 ds.extend(xs.iter().map(Differentiable::derivative));
-                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
+                combine(&ds, |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
             }
             And(ref xs) => {
                 let ds: Vec<_> = xs.iter().map(Differentiable::derivative).collect();
-                combine(&ds[], |regexes| And(regexes.iter().map(|r| (*r).clone()).collect()))
+                combine(&ds, |regexes| And(regexes.iter().map(|r| (*r).clone()).collect()))
             }
             Not(box ref x) => x.derivative().map(|r| Not(box r)),
             Cat(ref xs) => {
@@ -234,14 +234,14 @@ impl Differentiable for Regex {
                 for i in 0..xs.len() {
                     ds.push(xs[i].derivative().map(|r| {
                         let mut v = vec![r];
-                        v.push_all(xs.slice_from(i+1));
+                        v.push_all(&xs[i+1..]);
                         Cat(v)
                     }));
                     if !xs[i].nullable() {
                         break;
                     }
                 }
-                combine(&ds[], |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
+                combine(&ds, |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
             }
             Kleene(box ref x) => x.derivative().map(|r| Cat(vec![r, Kleene(box x.clone())])),
         }
