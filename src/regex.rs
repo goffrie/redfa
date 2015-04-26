@@ -1,33 +1,33 @@
-use std::{vec, char};
+use std::{vec, char, fmt};
 use std::collections::BTreeSet;
 use std::iter::{self, Peekable};
 use self::Regex::*;
 use dfa::Normalize;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub enum Regex {
+pub enum Regex<T> {
     Null, // the null set (never matches)
     Empty, // the empty string (matches exactly "")
-    Except(Vec<char>), // any character except these
-    Alt(Vec<char>, Vec<Regex>), // alternation (disjunction)
-    And(Vec<Regex>), // conjunction
-    Not(Box<Regex>), // negation
-    Cat(Vec<Regex>), // concatenation
-    Kleene(Box<Regex>), // Kleene closure
+    Except(Vec<T>), // any character except these
+    Alt(Vec<T>, Vec<Regex<T>>), // alternation (disjunction)
+    And(Vec<Regex<T>>), // conjunction
+    Not(Box<Regex<T>>), // negation
+    Cat(Vec<Regex<T>>), // concatenation
+    Kleene(Box<Regex<T>>), // Kleene closure
 }
 
-struct Puller<A, Fun: FnMut(A) -> Result<Vec<A>, A>, Iter: Iterator> {
+struct Puller<A, B, Fun: FnMut(A) -> Result<Vec<A>, B>, Iter: Iterator> {
     s: Iter,
     f: Fun,
     cur: Vec<vec::IntoIter<A>>,
 }
 
 trait Pull<A> {
-    fn pull<Fun: FnMut(A) -> Result<Vec<A>, A>>(self, f: Fun) -> Puller<A, Fun, Self>;
+    fn pull<B, Fun: FnMut(A) -> Result<Vec<A>, B>>(self, f: Fun) -> Puller<A, B, Fun, Self>;
 }
 
 impl<A, It: Iterator<Item=A>> Pull<A> for It {
-    fn pull<Fun: FnMut(A) -> Result<Vec<A>, A>>(self, f: Fun) -> Puller<A, Fun, Self> {
+    fn pull<B, Fun: FnMut(A) -> Result<Vec<A>, B>>(self, f: Fun) -> Puller<A, B, Fun, Self> {
         Puller {
             s: self,
             f: f,
@@ -36,20 +36,18 @@ impl<A, It: Iterator<Item=A>> Pull<A> for It {
     }
 }
 
-impl<A, Fun: FnMut(A) -> Result<Vec<A>, A>, Iter: Iterator<Item=A>> Iterator for Puller<A, Fun, Iter> {
-    type Item = A;
-    fn next(&mut self) -> Option<A> {
+impl<A, B, Fun: FnMut(A) -> Result<Vec<A>, B>, Iter: Iterator<Item=A>> Iterator for Puller<A, B, Fun, Iter> {
+    type Item = B;
+    fn next(&mut self) -> Option<B> {
         let mut el = None;
-        while self.cur.len() > 0 {
-            let l = self.cur.len();
-            if let Some(y) = self.cur[l-1].next() {
+        while let Some(mut it) = self.cur.pop() {
+            if let Some(y) = it.next() {
                 el = Some(y);
+                self.cur.push(it);
                 break;
-            } else {
-                self.cur.pop();
             }
         }
-        if let None = el {
+        if el.is_none() {
             el = self.s.next();
         }
         match el {
@@ -69,8 +67,8 @@ impl<A, Fun: FnMut(A) -> Result<Vec<A>, A>, Iter: Iterator<Item=A>> Iterator for
     }
 }
 
-impl Normalize for Regex {
-    fn normalize(self) -> Regex {
+impl<T: Ord> Normalize for Regex<T> {
+    fn normalize(self) -> Self {
         let not_null = Not(box Null); // FIXME: allocation here ;_;
         match self {
             Null => Null,
@@ -81,7 +79,7 @@ impl Normalize for Regex {
                 for c in a.into_iter() {
                     chars.insert(c);
                 }
-                let mut xs = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
+                let mut xs: BTreeSet<_> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     Alt(cs, v) => {
                         for c in cs.into_iter() {
                             chars.insert(c);
@@ -89,7 +87,7 @@ impl Normalize for Regex {
                         Ok(v)
                     }
                     x => Err(x)
-                }).collect::<BTreeSet<Regex>>();
+                }).collect();
 
                 if xs.contains(&not_null) {
                     return not_null;
@@ -106,7 +104,7 @@ impl Normalize for Regex {
                 }
             }
             And(xs) => {
-                let mut xs: BTreeSet<Regex> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
+                let mut xs: BTreeSet<_> = xs.into_iter().map(Normalize::normalize).pull(|x| match x {
                     And(v) => Ok(v),
                     x => Err(x)
                 }).collect();
@@ -188,180 +186,191 @@ pub enum ParseError {
     UnexpectedChar(&'static str, char),
     BadRange(&'static str, char, char),
 }
-type Pk<I> = Peekable<I>;
-type Res = Result<Regex, ParseError>;
-impl Regex {
-    fn parse<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-        fn char<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Result<char, ParseError> {
-            match it.next() {
-                Some('\\') => {
-                    match it.next() {
-                        Some('r') => Ok('\r'),
-                        Some('n') => Ok('\n'),
-                        Some('t') => Ok('\t'),
-                        Some(c) => Ok(c),
-                        None => Err(ParseError::UnexpectedEof("unfollowed '\\'"))
-                    }
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ParseError::UnexpectedEof(s) => write!(f, "{}", s),
+            ParseError::UnexpectedChar(s, c) => write!(f, "{}: {}", s, c),
+            ParseError::BadRange(s, c, d) => write!(f, "{}: {}-{}", s, c, d),
+        }
+    }
+}
+struct Parser<I: Iterator<Item=char>> {
+    it: Peekable<I>,
+}
+type Res<T> = Result<T, ParseError>;
+impl<I: Iterator<Item=char>> Parser<I> {
+    fn char(&mut self) -> Res<char> {
+        match self.it.next() {
+            Some('\\') => {
+                match self.it.next() {
+                    Some('r') => Ok('\r'),
+                    Some('n') => Ok('\n'),
+                    Some('t') => Ok('\t'),
+                    Some(c) => Ok(c),
+                    None => Err(ParseError::UnexpectedEof("unfollowed '\\'"))
                 }
-                Some(c) => {
-                    Ok(c)
-                }
-                None => panic!("char not nullable")
             }
+            Some(c) => {
+                Ok(c)
+            }
+            None => panic!("char not nullable")
         }
-        fn char_first(c: char) -> bool {
-            c != '~' && c != '|' && c != '&'
-                && c != '[' && c != ']'
-                && c != '(' && c != ')'
-                && c != '*' && c != '+'
-                && c != '~' && c != '.'
-        }
-        fn char_group(c: char) -> bool {
-            c != ']'
-        }
-        fn chars<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Result<Vec<char>, ParseError> {
-            let mut v = Vec::new();
-            loop {
-                match it.peek() {
-                    Some(&c) if char_group(c) => {
-                        let c = try!(char(it));
-                        if let Some(&'-') = it.peek() {
-                            it.next();
-                            if let None = it.peek() {
-                                return Err(ParseError::UnexpectedEof("unterminated range"));
-                            }
-                            let d = try!(char(it));
-                            for x in iter::range_inclusive(c as u32, d as u32) {
-                                if let Some(x) = char::from_u32(x) {
-                                    v.push(x);
-                                } else {
-                                    return Err(ParseError::BadRange("range contains bad codepoints", c, d));
-                                }
-                            }
-                        } else {
-                            v.push(c);
+    }
+    fn char_first(c: char) -> bool {
+        c != '~' && c != '|' && c != '&'
+            && c != '[' && c != ']'
+            && c != '(' && c != ')'
+            && c != '*' && c != '+'
+            && c != '~' && c != '.'
+    }
+    fn char_group(c: char) -> bool {
+        c != ']'
+    }
+    fn chars(&mut self) -> Res<Vec<char>> {
+        let mut v = Vec::new();
+        loop {
+            match self.it.peek() {
+                Some(&c) if Parser::<I>::char_group(c) => {
+                    let c = try!(self.char());
+                    if let Some(&'-') = self.it.peek() {
+                        self.it.next();
+                        if let None = self.it.peek() {
+                            return Err(ParseError::UnexpectedEof("unterminated range"));
                         }
-                    }
-                    _ => {
-                        break;
-                    }
-                }
-            }
-            Ok(v)
-        }
-        fn atom<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            match it.peek() {
-                Some(&'(') => {
-                    it.next();
-                    let r = try!(alt(it));
-                    match it.next() {
-                        Some(')') => Ok(r),
-                        Some(c) => Err(ParseError::UnexpectedChar("unexpected character", c)),
-                        None => Err(ParseError::UnexpectedEof("unmatched '('")),
-                    }
-                }
-                Some(&'[') => {
-                    it.next();
-                    let except = if let Some(&'^') = it.peek() {
-                        it.next();
-                        true
+                        let d = try!(self.char());
+                        for x in iter::range_inclusive(c as u32, d as u32) {
+                            if let Some(x) = char::from_u32(x) {
+                                v.push(x);
+                            } else {
+                                return Err(ParseError::BadRange("range contains bad codepoints", c, d));
+                            }
+                        }
                     } else {
-                        false
-                    };
-                    let r = try!(chars(it));
-                    match it.next() {
-                        Some(']') => Ok(if except {
-                            Except(r)
-                        } else {
-                            Alt(r, Vec::new())
-                        }),
-                        Some(c) => Err(ParseError::UnexpectedChar("bad char for character class", c)),
-                        None => Err(ParseError::UnexpectedEof("unmatched '['")),
+                        v.push(c);
                     }
-                }
-                Some(&'.') => {
-                    it.next();
-                    Ok(Except(Vec::new()))
-                }
-                Some(_) => Ok(Alt(vec![try!(char(it))], Vec::new())),
-                None => panic!("atom not nullable"),
-            }
-        }
-        fn atom_first(c: char) -> bool {
-            c == '(' || c == '[' || c == '.' || char_first(c)
-        }
-        fn kleene<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            let mut r = try!(atom(it));
-            loop {
-                match it.peek() {
-                    Some(&'*') => {
-                        it.next();
-                        r = Kleene(box r)
-                    }
-                    Some(&'+') => {
-                        it.next();
-                        r = Cat(vec![r.clone(), Kleene(box r)])
-                    }
-                    _ => break,
-                }
-            }
-            Ok(r)
-        }
-        fn kleene_first(c: char) -> bool {
-            atom_first(c)
-        }
-        fn cat<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            let mut r = Vec::new();
-            loop {
-                match it.peek() {
-                    Some(&c) if kleene_first(c) => r.push(try!(kleene(it))),
-                    _ => break,
-                }
-            }
-            Ok(Cat(r))
-        }
-        fn not<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            match it.peek() {
-                Some(&'~') => {
-                    it.next();
-                    Ok(Not(box try!(not(it))))
                 }
                 _ => {
-                    cat(it)
+                    break;
                 }
             }
         }
-        fn and<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            let mut r = vec![try!(not(it))];
-            loop {
-                match it.peek() {
-                    Some(&'&') => {
-                        it.next();
-                        r.push(try!(not(it)));
-                    }
-                    _ => break,
-                }
-            }
-            Ok(And(r))
-        }
-        fn alt<I: Iterator<Item=char>>(it: &mut Pk<I>) -> Res {
-            let mut r = vec![try!(and(it))];
-            loop {
-                match it.peek() {
-                    Some(&'|') => {
-                        it.next();
-                        r.push(try!(and(it)));
-                    }
-                    _ => break,
-                }
-            }
-            Ok(Alt(Vec::new(),r))
-        }
-        alt(it)
+        Ok(v)
     }
-    pub fn new(s: &str) -> Result<Regex, ParseError> {
+    fn atom(&mut self) -> Res<Regex<char>> {
+        match self.it.peek() {
+            Some(&'(') => {
+                self.it.next();
+                let r = try!(self.alt());
+                match self.it.next() {
+                    Some(')') => Ok(r),
+                    Some(c) => Err(ParseError::UnexpectedChar("unexpected character", c)),
+                    None => Err(ParseError::UnexpectedEof("unmatched '('")),
+                }
+            }
+            Some(&'[') => {
+                self.it.next();
+                let except = if let Some(&'^') = self.it.peek() {
+                    self.it.next();
+                    true
+                } else {
+                    false
+                };
+                let r = try!(self.chars());
+                match self.it.next() {
+                    Some(']') => Ok(if except {
+                        Except(r)
+                    } else {
+                        Alt(r, Vec::new())
+                    }),
+                    Some(c) => Err(ParseError::UnexpectedChar("bad char for character class", c)),
+                    None => Err(ParseError::UnexpectedEof("unmatched '['")),
+                }
+            }
+            Some(&'.') => {
+                self.it.next();
+                Ok(Except(Vec::new()))
+            }
+            Some(_) => Ok(Alt(vec![try!(self.char())], Vec::new())),
+            None => panic!("atom not nullable"),
+        }
+    }
+    fn atom_first(c: char) -> bool {
+        c == '(' || c == '[' || c == '.' || Parser::<I>::char_first(c)
+    }
+    fn kleene(&mut self) -> Res<Regex<char>> {
+        let mut r = try!(self.atom());
+        loop {
+            match self.it.peek() {
+                Some(&'*') => {
+                    self.it.next();
+                    r = Kleene(box r)
+                }
+                Some(&'+') => {
+                    self.it.next();
+                    r = Cat(vec![r.clone(), Kleene(box r)])
+                }
+                _ => break,
+            }
+        }
+        Ok(r)
+    }
+    fn kleene_first(c: char) -> bool {
+        Parser::<I>::atom_first(c)
+    }
+    fn cat(&mut self) -> Res<Regex<char>> {
+        let mut r = Vec::new();
+        loop {
+            match self.it.peek() {
+                Some(&c) if Parser::<I>::kleene_first(c) => r.push(try!(self.kleene())),
+                _ => break,
+            }
+        }
+        Ok(Cat(r))
+    }
+    fn not(&mut self) -> Res<Regex<char>> {
+        match self.it.peek() {
+            Some(&'~') => {
+                self.it.next();
+                Ok(Not(box try!(self.not())))
+            }
+            _ => self.cat()
+        }
+    }
+    fn and(&mut self) -> Res<Regex<char>> {
+        let mut r = vec![try!(self.not())];
+        loop {
+            match self.it.peek() {
+                Some(&'&') => {
+                    self.it.next();
+                    r.push(try!(self.not()));
+                }
+                _ => break,
+            }
+        }
+        Ok(And(r))
+    }
+    fn alt(&mut self) -> Res<Regex<char>> {
+        let mut r = vec![try!(self.and())];
+        loop {
+            match self.it.peek() {
+                Some(&'|') => {
+                    self.it.next();
+                    r.push(try!(self.and()));
+                }
+                _ => break,
+            }
+        }
+        Ok(Alt(Vec::new(),r))
+    }
+    fn parse(it: &mut I) -> Res<Regex<char>> {
+        Parser { it: it.peekable() }.alt()
+    }
+}
+impl Regex<char> {
+    pub fn new(s: &str) -> Result<Regex<char>, ParseError> {
         let mut iter = s.chars().peekable();
-        let r = try!(Regex::parse(&mut iter));
+        let r = try!(Parser::parse(&mut iter));
         if let Some(c) = iter.next() {
             Err(ParseError::UnexpectedChar("bad char in regex", c))
         } else {
@@ -370,7 +379,7 @@ impl Regex {
     }
 }
 
-impl Regex {
+impl<T> Regex<T> {
     // FIXME: This could be inefficient. Try to cache it in the data structure
     pub fn nullable(&self) -> bool {
         match *self {

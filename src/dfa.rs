@@ -3,14 +3,14 @@ use std::collections::{BTreeMap, VecDeque};
 use std::collections::btree_map::{Entry};
 
 #[derive(Debug, Clone)]
-pub struct Transition {
-    pub by_char: BTreeMap<char, u32>,
+pub struct Transition<T> {
+    pub by_char: BTreeMap<T, u32>,
     pub default: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct Dfa {
-    pub transitions: Vec<Transition>,
+pub struct Dfa<T> {
+    pub transitions: Vec<Transition<T>>,
 }
 
 pub trait Normalize {
@@ -23,8 +23,8 @@ impl<R: Normalize> Normalize for Vec<R> {
     }
 }
 
-impl Dfa {
-    pub fn from_derivatives<R: Differentiable + Normalize + Ord + Clone>(initial: Vec<R>) -> (Dfa, BTreeMap<R, u32>) {
+impl<T: Ord> Dfa<T> {
+    pub fn from_derivatives<R: Differentiable<T> + Normalize + Ord + Clone>(initial: Vec<R>) -> (Dfa<T>, BTreeMap<R, u32>) {
         fn index<R: Ord + Clone>(worklist: &mut (BTreeMap<R, u32>, VecDeque<R>), re: R) -> u32 {
             let next_index = worklist.0.len() as u32;
             match worklist.0.entry(re.clone()) { // FIXME: unnecessary allocation

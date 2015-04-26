@@ -1,16 +1,16 @@
 use std::iter::Peekable;
 use std::cmp::Ordering;
-use regex::Regex::*;
-use regex::Regex;
+use Regex::*;
+use Regex;
 
 #[derive(Debug,Clone)]
-pub struct Derivatives<R> {
-    pub d: Vec<(Vec<char>, R)>,
+pub struct Derivatives<T, R> {
+    pub d: Vec<(Vec<T>, R)>,
     pub rest: R,
 }
 
-impl<R> Derivatives<R> {
-    pub fn map<F: FnMut(R) -> R>(self, mut f: F) -> Derivatives<R> {
+impl<T, R> Derivatives<T, R> {
+    pub fn map<F: FnMut(R) -> R>(self, mut f: F) -> Derivatives<T, R> {
         Derivatives {
             d: self.d.map_in_place(|(x, r)| (x, f(r))),
             rest: f(self.rest),
@@ -18,8 +18,8 @@ impl<R> Derivatives<R> {
     }
 }
 
-pub trait Differentiable {
-    fn derivative(&self) -> Derivatives<Self>;
+pub trait Differentiable<T> {
+    fn derivative(&self) -> Derivatives<T, Self>;
 }
 
 struct Union<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> {
@@ -125,55 +125,55 @@ impl<T: Ord, It1: Iterator<Item=T>, It2: Iterator<Item=T>> Iterator for Subtract
     }
 }
 
-enum CharSet {
-    Just(Vec<char>),
-    Not(Vec<char>),
+enum Set<T> {
+    Just(Vec<T>),
+    Not(Vec<T>),
 }
 
-impl CharSet {
-    fn inter(&self, b: &[char]) -> CharSet {
-        use self::CharSet::{Just, Not};
+impl<T: Ord + Clone> Set<T> {
+    fn inter(&self, b: &[T]) -> Set<T> {
+        use self::Set::*;
         match *self {
             Just(ref a) => {
-                Just(inter(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
+                Just(inter(a.iter().cloned(), b.iter().cloned()).collect())
             }
             Not(ref a) => {
-                Just(subtract(b.iter().map(|x| *x), a.iter().map(|x| *x)).collect())
+                Just(subtract(b.iter().cloned(), a.iter().cloned()).collect())
             }
         }
     }
-    fn subtract(&self, b: &[char]) -> CharSet {
-        use self::CharSet::{Just, Not};
+    fn subtract(&self, b: &[T]) -> Set<T> {
+        use self::Set::*;
         match *self {
             Just(ref a) => {
-                Just(subtract(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
+                Just(subtract(a.iter().cloned(), b.iter().cloned()).collect())
             }
             Not(ref a) => {
-                Not(union(a.iter().map(|x| *x), b.iter().map(|x| *x)).collect())
+                Not(union(a.iter().cloned(), b.iter().cloned()).collect())
             }
         }
     }
 }
 
-fn combine<R, S, F: FnMut(&[&R]) -> S>(v: &[Derivatives<R>], mut f: F) -> Derivatives<S> {
-    fn go<'a, R, S, F: FnMut(&[&R]) -> S>(
-        v: &'a [Derivatives<R>],
+fn combine<T: Ord + Clone, R, S, F: FnMut(&[&R]) -> S>(v: &[Derivatives<T, R>], mut f: F) -> Derivatives<T, S> {
+    fn go<'a, T: Ord + Clone, R, S, F: FnMut(&[&R]) -> S>(
+        v: &'a [Derivatives<T, R>],
         f: &mut F,
-        what: CharSet,
-        res: &mut Vec<&'a R>,
-        out: &mut (Vec<(Vec<char>, S)>, Option<S>)
+        what: Set<T>,
+        current: &mut Vec<&'a R>,
+        out: &mut (Vec<(Vec<T>, S)>, Option<S>)
     ) {
-        if let CharSet::Just(ref v) = what {
+        if let Set::Just(ref v) = what {
             if v.len() == 0 {
                 // prune
                 return;
             }
         }
         if v.len() == 0 {
-            let reg = f(&res);
+            let reg = f(&current);
             match what {
-                CharSet::Just(c) => out.0.push((c, reg)),
-                CharSet::Not(_) => {
+                Set::Just(c) => out.0.push((c, reg)),
+                Set::Not(_) => {
                     assert!(out.1.is_none());
                     out.1 = Some(reg);
                 }
@@ -184,28 +184,28 @@ fn combine<R, S, F: FnMut(&[&R]) -> S>(v: &[Derivatives<R>], mut f: F) -> Deriva
         let first = &first[0];
         let mut all_chars = Vec::new();
         for &(ref chars, ref reg) in first.d.iter() {
-            all_chars = union(all_chars.into_iter(), chars.iter().map(|x| *x)).collect();
+            all_chars = union(all_chars.into_iter(), chars.iter().cloned()).collect();
             let inter = what.inter(&chars);
-            res.push(reg);
-            go(rest, f, inter, res, out);
-            res.pop();
+            current.push(reg);
+            go(rest, f, inter, current, out);
+            current.pop();
         }
         let inter = what.subtract(&all_chars);
-        res.push(&first.rest);
-        go(rest, f, inter, res, out);
-        res.pop();
+        current.push(&first.rest);
+        go(rest, f, inter, current, out);
+        current.pop();
     }
     let mut result = (Vec::new(), None);
     let mut regexes = Vec::new();
-    go(v, &mut f, CharSet::Not(Vec::new()), &mut regexes, &mut result);
+    go(v, &mut f, Set::Not(Vec::new()), &mut regexes, &mut result);
     Derivatives {
         d: result.0,
         rest: result.1.unwrap(),
     }
 }
 
-impl Differentiable for Regex {
-    fn derivative(&self) -> Derivatives<Regex> {
+impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
+    fn derivative(&self) -> Derivatives<T, Regex<T>> {
         match *self {
             Null => Derivatives { d: Vec::new(), rest: Null },
             Empty => Derivatives { d: Vec::new(), rest: Null },
@@ -249,9 +249,9 @@ impl Differentiable for Regex {
 }
 
 // Derivatives of "regular vectors", as described in "Regular-expression derivatives reexamined" by Owens et al.
-impl<R: Differentiable + Clone> Differentiable for Vec<R> {
-    fn derivative(&self) -> Derivatives<Vec<R>> {
-        let v: Vec<Derivatives<R>> = self.iter().map(Differentiable::derivative).collect();
+impl<T: Ord + Clone, R: Differentiable<T> + Clone> Differentiable<T> for Vec<R> {
+    fn derivative(&self) -> Derivatives<T, Vec<R>> {
+        let v: Vec<Derivatives<T, R>> = self.iter().map(Differentiable::derivative).collect();
         combine(&*v, |xs: &[&R]| xs.iter().map(|&x| x.clone()).collect())
     }
 }
