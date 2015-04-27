@@ -11,7 +11,7 @@ pub enum Regex<T> {
     Null,
     /// The empty string (matches exactly "").
     Empty,
-    /// Matches any character except the listed ones.
+    /// Matches any single character except the listed ones.
     Except(Vec<T>),
     /// Alternation (also known as disjunction). Matches any of the contained
     /// characters, as well as any string matched by a contained regex.
@@ -200,8 +200,8 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ParseError::UnexpectedEof(s) => write!(f, "{}", s),
-            ParseError::UnexpectedChar(s, c) => write!(f, "{}: {}", s, c),
-            ParseError::BadRange(s, c, d) => write!(f, "{}: {}-{}", s, c, d),
+            ParseError::UnexpectedChar(s, c) => write!(f, "{}: `{}`", s, c),
+            ParseError::BadRange(s, c, d) => write!(f, "{}: `{}-{}`", s, c, d),
         }
     }
 }
@@ -293,7 +293,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
                     } else {
                         Alt(r, Vec::new())
                     }),
-                    Some(c) => Err(ParseError::UnexpectedChar("bad char for character class", c)),
+                    Some(c) => Err(ParseError::UnexpectedChar("bad character for character class", c)),
                     None => Err(ParseError::UnexpectedEof("unmatched '['")),
                 }
             }
@@ -373,8 +373,14 @@ impl<I: Iterator<Item=char>> Parser<I> {
         }
         Ok(Alt(Vec::new(),r))
     }
-    fn parse(it: &mut I) -> Res<Regex<char>> {
-        Parser { it: it.peekable() }.alt()
+    fn parse(it: I) -> Res<Regex<char>> {
+        let mut parser = Parser { it: it.peekable() };
+        let r = try!(parser.alt());
+        if let Some(c) = parser.it.next() {
+            Err(ParseError::UnexpectedChar("bad character in regex", c))
+        } else {
+            Ok(r)
+        }
     }
 }
 
@@ -382,13 +388,7 @@ impl str::FromStr for Regex<char> {
     type Err = ParseError;
     /// Parse a string as a regular expression.
     fn from_str(s: &str) -> Result<Regex<char>, ParseError> {
-        let mut iter = s.chars().peekable();
-        let r = try!(Parser::parse(&mut iter));
-        if let Some(c) = iter.next() {
-            Err(ParseError::UnexpectedChar("bad char in regex", c))
-        } else {
-            Ok(r)
-        }
+        Parser::parse(s.chars())
     }
 }
 

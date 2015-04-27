@@ -7,7 +7,7 @@ fn main() {
     let mut line = String::new();
     while let Ok(_) = std::io::stdin().read_line(&mut line) {
         match line.trim().parse::<Regex<char>>() {
-            Err(e) => println!("error: {:?}", e),
+            Err(e) => println!("error: {}", e),
             Ok(x) => {
                 println!("ok: {:?}", x);
                 let x = x.normalize();
