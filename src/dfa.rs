@@ -308,3 +308,13 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
 }
 impl<T: Ord, V: Eq> Eq for Dfa<T, V> {
 }
+
+impl<T, V> Dfa<T, V> {
+    /// Compare DFAs by language equality.
+    pub fn equiv<U>(&self, other: &Dfa<T, U>) -> bool
+        where T: Ord + Clone,
+              U: Ord,
+              V: Ord + PartialEq<U> {
+        return self.minimize() == other.minimize();
+    }
+}
