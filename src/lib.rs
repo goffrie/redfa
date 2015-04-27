@@ -3,7 +3,7 @@
 #![crate_type="dylib"]
 #![feature(box_syntax, box_patterns, core, collections)]
 pub use regex::Regex;
-pub use dfa::{Transition, Dfa};
+pub use dfa::{State, Dfa};
 pub mod regex;
 pub mod derivatives;
 pub mod dfa;
