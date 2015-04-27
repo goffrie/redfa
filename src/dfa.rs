@@ -57,13 +57,16 @@ impl<T, V> Dfa<T, V> {
         while let Some(re) = worklist.1.pop_front() {
             let d = re.derivative();
             let mut by_char = BTreeMap::new();
+            let default = index(&mut worklist, d.rest.normalize());
             for (chars, dre) in d.d {
                 let ix = index(&mut worklist, dre.normalize());
-                for ch in chars {
-                    by_char.insert(ch, ix);
+                // no point putting entries that are equal to the default
+                if ix != default {
+                    for ch in chars {
+                        by_char.insert(ch, ix);
+                    }
                 }
             }
-            let default = index(&mut worklist, d.rest.normalize());
             result.states.push(State {
                 by_char: by_char,
                 default: default,
