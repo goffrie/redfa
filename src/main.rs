@@ -16,8 +16,9 @@ fn main() {
                 let (dfa, _mapping) = Dfa::from_derivatives(vec![x, Regex::Null]);
                 let dfa = dfa.map(|reg| reg.nullable());
                 println!("DFA: {:?}\n", dfa);
-                let dfa = dfa.minimize();
-                println!("Minimized DFA: {:?}\n", dfa);
+                let mdfa = dfa.minimize().map(|x| *x);
+                println!("Minimized DFA: {:?}\n", mdfa);
+                println!("dfa == mdfa: {:?}\n", dfa == mdfa);
             }
         }
         line = String::new();

@@ -1,5 +1,5 @@
 use derivatives::Differentiable;
-use std::collections::{BTreeMap, BTreeSet, VecDeque, BitSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque, VecMap, BitSet};
 
 /// A state in a DFA.
 #[derive(Debug, Clone)]
@@ -246,4 +246,50 @@ impl<T, V> Dfa<T, V> {
 
         Dfa { states: states }
     }
+}
+
+/// Compare DFAs by graph isomorphism.
+impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
+    fn eq(&self, other: &Dfa<T, U>) -> bool {
+        if self.states.len() != other.states.len() {
+            return false;
+        }
+        let mut mapping = VecMap::with_capacity(self.states.len());
+        let mut worklist = VecDeque::new();
+        mapping.insert(0, 0);
+        worklist.push_back(0);
+        while let Some(ix) = worklist.pop_front() {
+            let other_ix = mapping[ix as usize];
+            let a = &self.states[ix as usize];
+            let b = &other.states[other_ix as usize];
+            if a.by_char.len() != b.by_char.len() {
+                return false;
+            }
+            for (c, &to) in &a.by_char {
+                if let Some(&other_to) = b.by_char.get(c) {
+                    if let Some(old_mapping) = mapping.insert(to as usize, other_to) {
+                        // make sure the replaced element was the same
+                        if old_mapping != other_to {
+                            return false;
+                        }
+                    } else {
+                        // new mapping
+                        worklist.push_back(to);
+                    }
+                } else {
+                    return false;
+                }
+            }
+            if let Some(old_mapping) = mapping.insert(a.default as usize, b.default) {
+                if old_mapping != b.default {
+                    return false;
+                }
+            } else {
+                worklist.push_back(a.default);
+            }
+        }
+        return true;
+    }
+}
+impl<T: Ord, V: Eq> Eq for Dfa<T, V> {
 }
