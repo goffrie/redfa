@@ -7,3 +7,8 @@ authors = ["Geoffry Song <goffrie@gmail.com>"]
 [lib]
 
 name = "regex_dfa"
+
+[[bin]]
+
+name = "regex_test"
+doc = false

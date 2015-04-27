@@ -233,7 +233,7 @@ impl<T, V> Dfa<T, V> {
                       .map(move |&state_ix| (state_ix, part_ix as u32)))
             .collect();
 
-        let states = partitions.iter().map(|part| {
+        let states: Vec<_> = partitions.iter().map(|part| {
             let state_ix = *part.iter().next().unwrap();
             let state = &self.states[state_ix];
             let default = partition[&(state.default as usize)];
@@ -246,6 +246,16 @@ impl<T, V> Dfa<T, V> {
                 value: &state.value,
             }
         }).collect();
+
+        // Sanity check: the partitions should really be valid.
+        debug_assert!(partitions.iter().zip(states.iter()).all(|(part, new_state)| {
+            part.iter().all(|&state_ix| {
+                let state = &self.states[state_ix];
+                state.by_char.iter().all(|(key, &to)| partition[&(to as usize)] == new_state.by_char.get(key).cloned().unwrap_or(new_state.default))
+                    && partition[&(state.default as usize)] == new_state.default
+                    && state.value == *new_state.value
+            })
+        }));
 
         Dfa { states: states }
     }
