@@ -6,7 +6,7 @@ use regex_dfa::dfa::Normalize;
 fn main() {
     let mut line = String::new();
     while let Ok(_) = std::io::stdin().read_line(&mut line) {
-        match Regex::new(line.trim()) {
+        match line.trim().parse::<Regex<char>>() {
             Err(e) => println!("error: {:?}", e),
             Ok(x) => {
                 println!("ok: {:?}", x);

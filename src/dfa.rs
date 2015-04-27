@@ -15,9 +15,10 @@ pub struct State<T, V> {
 
 /// A deterministic finite automaton (DFA), over the alphabet `T`.
 /// Each state is annotated with a value of type `V`.
-/// The starting state is the first one.
+/// State 0 is the starting state.
 #[derive(Debug, Clone)]
 pub struct Dfa<T, V> {
+    /// The list of states.
     pub states: Vec<State<T, V>>,
 }
 
@@ -77,6 +78,7 @@ impl<T, V> Dfa<T, V> {
         (result, worklist.0)
     }
 
+    /// Apply a function to each state's value.
     pub fn map<U, F>(self, mut f: F) -> Dfa<T, U>
         where F: FnMut(V) -> U {
         Dfa {

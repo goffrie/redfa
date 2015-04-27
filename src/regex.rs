@@ -1,19 +1,29 @@
-use std::{vec, char, fmt};
+use std::{vec, char, fmt, str};
 use std::collections::BTreeSet;
 use std::iter::{self, Peekable};
 use self::Regex::*;
 use dfa::Normalize;
 
+/// A regular expression over the alphabet `T`.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
 pub enum Regex<T> {
-    Null, // the null set (never matches)
-    Empty, // the empty string (matches exactly "")
-    Except(Vec<T>), // any character except these
-    Alt(Vec<T>, Vec<Regex<T>>), // alternation (disjunction)
-    And(Vec<Regex<T>>), // conjunction
-    Not(Box<Regex<T>>), // negation
-    Cat(Vec<Regex<T>>), // concatenation
-    Kleene(Box<Regex<T>>), // Kleene closure
+    /// The null set. This never matches anything.
+    Null,
+    /// The empty string (matches exactly "").
+    Empty,
+    /// Matches any character except the listed ones.
+    Except(Vec<T>),
+    /// Alternation (also known as disjunction). Matches any of the contained
+    /// characters, as well as any string matched by a contained regex.
+    Alt(Vec<T>, Vec<Regex<T>>),
+    /// Conjunction. Matches iff all contained regexes match.
+    And(Vec<Regex<T>>),
+    /// Negation. Matches iff the contained regex does not match.
+    Not(Box<Regex<T>>),
+    /// Concatenation. Matches iff the contained regexes match in sequence.
+    Cat(Vec<Regex<T>>),
+    /// Kleene closure. Matches zero or more repetitions of the contained regex.
+    Kleene(Box<Regex<T>>),
 }
 
 struct Puller<A, B, Fun: FnMut(A) -> Result<Vec<A>, B>, Iter: Iterator> {
@@ -367,8 +377,11 @@ impl<I: Iterator<Item=char>> Parser<I> {
         Parser { it: it.peekable() }.alt()
     }
 }
-impl Regex<char> {
-    pub fn new(s: &str) -> Result<Regex<char>, ParseError> {
+
+impl str::FromStr for Regex<char> {
+    type Err = ParseError;
+    /// Parse a string as a regular expression.
+    fn from_str(s: &str) -> Result<Regex<char>, ParseError> {
         let mut iter = s.chars().peekable();
         let r = try!(Parser::parse(&mut iter));
         if let Some(c) = iter.next() {
@@ -380,8 +393,10 @@ impl Regex<char> {
 }
 
 impl<T> Regex<T> {
-    // FIXME: This could be inefficient. Try to cache it in the data structure
+    /// Tests whether a regular expression is nullable, i.e. whether it matches
+    /// the empty string.
     pub fn nullable(&self) -> bool {
+        // FIXME: This could be inefficient. Try to cache it in the data structure
         match *self {
             Null => false,
             Empty => true,

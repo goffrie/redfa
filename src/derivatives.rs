@@ -3,9 +3,13 @@ use std::cmp::Ordering;
 use Regex::*;
 use Regex;
 
-#[derive(Debug,Clone)]
+/// The set of some object's derivatives with respect to an alphabet `T`.
+#[derive(Debug, Clone)]
 pub struct Derivatives<T, R> {
+    /// Holds a set of pairs `(chars, derivative)`, meaning that the derivative
+    /// with respect to any element of `chars` is `derivative`.
     pub d: Vec<(Vec<T>, R)>,
+    /// The derivative with respect to any character not listed in `d`.
     pub rest: R,
 }
 
@@ -18,6 +22,8 @@ impl<T, R> Derivatives<T, R> {
     }
 }
 
+/// A trait for types which can be differentiated with respect to an alphabet
+/// `T`.
 pub trait Differentiable<T> {
     fn derivative(&self) -> Derivatives<T, Self>;
 }
