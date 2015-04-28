@@ -3,9 +3,11 @@ extern crate regex_dfa;
 use regex_dfa::*;
 use regex_dfa::derivatives::Differentiable;
 use regex_dfa::dfa::Normalize;
+use std::io::BufRead;
 fn main() {
-    let mut line = String::new();
-    while let Ok(_) = std::io::stdin().read_line(&mut line) {
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        let line = line.unwrap();
         match line.trim().parse::<Regex<char>>() {
             Err(e) => println!("error: {}", e),
             Ok(x) => {
@@ -21,6 +23,5 @@ fn main() {
                 println!("dfa == mdfa: {:?}\n", dfa == mdfa);
             }
         }
-        line = String::new();
     }
 }
