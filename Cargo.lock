@@ -1,4 +1,4 @@
 [root]
-name = "regex_dfa"
+name = "regex-dfa"
 version = "0.0.1"
 
