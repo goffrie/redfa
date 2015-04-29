@@ -1,0 +1,18 @@
+# thanks huonw
+language: rust
+rust:
+  - nightly
+# uses feature gates - doesn't work on beta
+
+before_script:
+  - git clone --depth 1 https://github.com/huonw/travis-cargo
+  - ln -s ./travis-cargo/travis-cargo.py tc
+
+script:
+  - |
+      ./tc cargo build &&
+      ./tc cargo test &&
+      ./tc cargo doc
+
+after_success:
+  - ./tc --only beta doc-upload
