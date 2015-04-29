@@ -28,7 +28,7 @@ pub trait Normalize {
 
 impl<R: Normalize> Normalize for Vec<R> {
     fn normalize(self) -> Self {
-        self.map_in_place(Normalize::normalize)
+        self.into_iter().map(Normalize::normalize).collect()
     }
 }
 

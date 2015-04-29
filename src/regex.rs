@@ -1,6 +1,6 @@
 use std::{vec, char, fmt, str};
 use std::collections::BTreeSet;
-use std::iter::{self, Peekable};
+use std::iter::Peekable;
 use self::Regex::*;
 use dfa::Normalize;
 
@@ -79,7 +79,7 @@ impl<A, B, Fun: FnMut(A) -> Result<Vec<A>, B>, Iter: Iterator<Item=A>> Iterator 
 
 impl<T: Ord> Normalize for Regex<T> {
     fn normalize(self) -> Self {
-        let not_null = Not(box Null); // FIXME: allocation here ;_;
+        let not_null = Not(Box::new(Null)); // FIXME: allocation here ;_;
         match self {
             Null => Null,
             Empty => Empty,
@@ -129,10 +129,10 @@ impl<T: Ord> Normalize for Regex<T> {
                     _ => And(xs)
                 }
             }
-            Not(box x) => {
+            Not(x) => {
                 match x.normalize() {
-                    Not(box y) => y,
-                    y => Not(box y)
+                    Not(y) => *y,
+                    y => Not(Box::new(y))
                 }
             }
             Cat(xs) => {
@@ -157,13 +157,13 @@ impl<T: Ord> Normalize for Regex<T> {
                     _ => Cat(xs)
                 }
             }
-            Kleene(box x) => {
+            Kleene(x) => {
                 match x.normalize() {
                     Kleene(y) => Kleene(y),
                     Null => Empty,
                     Empty => Empty,
                     Except(ref chs) if chs.len() == 0 => not_null,
-                    y => Kleene(box y),
+                    y => Kleene(Box::new(y)),
                 }
             }
         }
@@ -249,8 +249,9 @@ impl<I: Iterator<Item=char>> Parser<I> {
                             return Err(ParseError::UnexpectedEof("unterminated range"));
                         }
                         let d = try!(self.char());
-                        for x in iter::range_inclusive(c as u32, d as u32) {
-                            if let Some(x) = char::from_u32(x) {
+                        // FIXME: This should be an inclusive range.
+                        for x in (c as u64)..(d as u64 + 1) {
+                            if let Some(x) = char::from_u32(x as u32) {
                                 v.push(x);
                             } else {
                                 return Err(ParseError::BadRange("range contains bad codepoints", c, d));
@@ -314,11 +315,11 @@ impl<I: Iterator<Item=char>> Parser<I> {
             match self.it.peek() {
                 Some(&'*') => {
                     self.it.next();
-                    r = Kleene(box r)
+                    r = Kleene(Box::new(r))
                 }
                 Some(&'+') => {
                     self.it.next();
-                    r = Cat(vec![r.clone(), Kleene(box r)])
+                    r = Cat(vec![r.clone(), Kleene(Box::new(r))])
                 }
                 _ => break,
             }
@@ -342,7 +343,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
         match self.it.peek() {
             Some(&'~') => {
                 self.it.next();
-                Ok(Not(box try!(self.not())))
+                Ok(Not(Box::new(try!(self.not()))))
             }
             _ => self.cat()
         }

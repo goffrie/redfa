@@ -16,7 +16,7 @@ pub struct Derivatives<T, R> {
 impl<T, R> Derivatives<T, R> {
     pub fn map<F: FnMut(R) -> R>(self, mut f: F) -> Derivatives<T, R> {
         Derivatives {
-            d: self.d.map_in_place(|(x, r)| (x, f(r))),
+            d: self.d.into_iter().map(|(x, r)| (x, f(r))).collect(),
             rest: f(self.rest),
         }
     }
@@ -234,13 +234,13 @@ impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
                 let ds: Vec<_> = xs.iter().map(Differentiable::derivative).collect();
                 combine(&ds, |regexes| And(regexes.iter().map(|r| (*r).clone()).collect()))
             }
-            Not(box ref x) => x.derivative().map(|r| Not(box r)),
+            Not(ref x) => x.derivative().map(|r| Not(Box::new(r))),
             Cat(ref xs) => {
                 let mut ds = Vec::new();
                 for i in 0..xs.len() {
                     ds.push(xs[i].derivative().map(|r| {
                         let mut v = vec![r];
-                        v.push_all(&xs[i+1..]);
+                        v.extend(xs[i+1..].iter().cloned());
                         Cat(v)
                     }));
                     if !xs[i].nullable() {
@@ -249,7 +249,7 @@ impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
                 }
                 combine(&ds, |regexes| Alt(Vec::new(), regexes.iter().map(|r| (*r).clone()).collect()))
             }
-            Kleene(box ref x) => x.derivative().map(|r| Cat(vec![r, Kleene(box x.clone())])),
+            Kleene(ref x) => x.derivative().map(|r| Cat(vec![r, Kleene(x.clone())])),
         }
     }
 }

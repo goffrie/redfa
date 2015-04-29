@@ -2,7 +2,7 @@
 language: rust
 rust:
   - nightly
-# uses feature gates - doesn't work on beta
+  - beta
 
 before_script:
   - git clone --depth 1 https://github.com/huonw/travis-cargo
