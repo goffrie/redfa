@@ -4,6 +4,16 @@ name = "regex-dfa"
 version = "0.0.1"
 authors = ["Geoffry Song <goffrie@gmail.com>"]
 
+homepage = "https://github.com/goffrie/regex-dfa"
+repository = "https://github.com/goffrie/regex-dfa"
+documentation = "http://goffrie.github.io/regex-dfa"
+license = "MIT"
+keywords = ["regex", "dfa"]
+
+[features]
+
+unstable = []
+
 [lib]
 
 name = "regex_dfa"
