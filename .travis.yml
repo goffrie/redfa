@@ -16,3 +16,7 @@ script:
 
 after_success:
   - ./tc --only nightly doc-upload
+
+env:
+  global:
+    secure: BwDmMvZd7LbcavO6B5lLAzeUAreqxktHlZSzhC1iQL52WT0KLtKaHwWwZXsrSvZN3L+5VgvFu/RBEPruAB2I1ek6H2/8JMgpNfK6S2PUJzzLCeQJoW+C6nWQuirwu3BCuV7MiAXW0BDSTBkr8bmxJ9/0ZgMNCWe9FQ2jRw8HtG0=
