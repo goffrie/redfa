@@ -15,4 +15,4 @@ script:
       ./tc cargo doc
 
 after_success:
-  - ./tc --only beta doc-upload
+  - ./tc --only nightly doc-upload
