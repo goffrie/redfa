@@ -90,6 +90,9 @@ macro_rules! dfa {
 macro_rules! assert_equiv {
     ($a: expr, $b: expr) => (assert_eq!($a.minimize(), $b.minimize()));
 }
+macro_rules! assert_not_equiv {
+    ($a: expr, $b: expr) => (assert!(!$a.equiv(&$b)));
+}
 
 #[test]
 fn test_dfa_minimize() {
@@ -180,4 +183,9 @@ fn test_regex_to_dfa() {
         3, 'a', 1;
         3, 'b', 2;
     });
+    assert_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&b*)"));
+    assert_not_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&a*)"));
+    assert_equiv!(to_dfa("~a"), to_dfa("|[^a]|...*"));
+    assert_not_equiv!(to_dfa("~a"), to_dfa("[^a]"));
+    assert_equiv!(to_dfa("(a.*b)&(.[b-d]*.)&(.*c..)"), to_dfa("a[b-d]*c[b-d]b"));
 }
