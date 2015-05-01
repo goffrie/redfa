@@ -15,6 +15,7 @@ script:
 
 after_success:
   - travis-cargo --only nightly doc-upload
+  - travis-cargo coveralls
 
 env:
   global:
