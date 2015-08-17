@@ -24,7 +24,7 @@ impl<T, R> Derivatives<T, R> {
 
 /// A trait for types which can be differentiated with respect to an alphabet
 /// `T`.
-pub trait Differentiable<T> {
+pub trait Differentiable<T>: Sized {
     fn derivative(&self) -> Derivatives<T, Self>;
 }
 

@@ -22,3 +22,8 @@ name = "regex_dfa"
 
 name = "regex_test"
 doc = false
+
+[dependencies]
+
+vec_map = "0.3.0"
+bit-set = "0.2.0"

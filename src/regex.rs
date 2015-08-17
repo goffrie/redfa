@@ -32,7 +32,7 @@ struct Puller<A, B, Fun: FnMut(A) -> Result<Vec<A>, B>, Iter: Iterator> {
     cur: Vec<vec::IntoIter<A>>,
 }
 
-trait Pull<A> {
+trait Pull<A>: Iterator + Sized {
     fn pull<B, Fun: FnMut(A) -> Result<Vec<A>, B>>(self, f: Fun) -> Puller<A, B, Fun, Self>;
 }
 

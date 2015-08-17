@@ -1,5 +1,7 @@
 use derivatives::Differentiable;
-use std::collections::{BTreeMap, BTreeSet, VecDeque, VecMap, BitSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use vec_map::VecMap;
+use bit_set::BitSet;
 
 /// A state in a DFA.
 #[derive(Debug, Clone)]
