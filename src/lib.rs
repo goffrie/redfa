@@ -1,7 +1,3 @@
-#![crate_name="regex_dfa"]
-#![crate_type="lib"]
-#![crate_type="dylib"]
-
 extern crate vec_map;
 extern crate bit_set;
 

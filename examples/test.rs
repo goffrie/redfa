@@ -1,8 +1,8 @@
 #![crate_type="bin"]
-extern crate regex_dfa;
-use regex_dfa::*;
-use regex_dfa::derivatives::Differentiable;
-use regex_dfa::dfa::Normalize;
+extern crate redfa;
+use redfa::*;
+use redfa::derivatives::Differentiable;
+use redfa::dfa::Normalize;
 use std::io::BufRead;
 fn main() {
     let stdin = std::io::stdin();

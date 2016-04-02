@@ -1,12 +1,12 @@
 [package]
 
-name = "regex-dfa"
+name = "redfa"
 version = "0.0.1"
 authors = ["Geoffry Song <goffrie@gmail.com>"]
 
-homepage = "https://github.com/goffrie/regex-dfa"
-repository = "https://github.com/goffrie/regex-dfa"
-documentation = "http://goffrie.github.io/regex-dfa"
+homepage = "https://github.com/goffrie/redfa"
+repository = "https://github.com/goffrie/redfa"
+documentation = "http://goffrie.github.io/redfa"
 license = "MIT OR Apache-2.0"
 keywords = ["regex", "dfa"]
 
@@ -16,7 +16,7 @@ unstable = []
 
 [lib]
 
-name = "regex_dfa"
+name = "redfa"
 
 [dependencies]
 
