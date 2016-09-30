@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ParseError",""],["Regex","A regular expression over the alphabet `T`."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Dfa","A deterministic finite automaton (DFA), over the alphabet `T`. Each state is annotated with a value of type `V`. State 0 is the starting state."],["State","A state in a DFA."]],"trait":[["Normalize",""]]});

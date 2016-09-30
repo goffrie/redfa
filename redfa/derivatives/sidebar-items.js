@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Derivatives","The set of some object's derivatives with respect to an alphabet `T`."]],"trait":[["Differentiable","A trait for types which can be differentiated with respect to an alphabet `T`."]]});
