@@ -4,6 +4,8 @@ name = "redfa"
 version = "0.0.1"
 authors = ["Geoffry Song <goffrie@gmail.com>"]
 
+description = "Regular expression derivatives for creating DFAs."
+
 homepage = "https://github.com/goffrie/redfa"
 repository = "https://github.com/goffrie/redfa"
 documentation = "http://goffrie.github.io/redfa"

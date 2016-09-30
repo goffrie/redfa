@@ -1,9 +1,16 @@
 language: rust
-sudo: required
+sudo: false
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - binutils-dev
 rust:
 - nightly
 - beta
-- 1.0.0
+- stable
 before_script:
 - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
 script:
@@ -13,7 +20,7 @@ script:
   travis-cargo doc
 after_success:
 - travis-cargo --only nightly doc-upload
-- travis-cargo coveralls
+- travis-cargo coveralls --no-sudo --verify
 env:
   global:
   - TRAVIS_CARGO_NIGHTLY_FEATURE=""
