@@ -7,6 +7,27 @@ use std::collections::BTreeMap;
 fn test_regex_parse() {
     assert_eq!("".parse::<Regex<char>>().unwrap().normalize(), Empty);
     assert_eq!("a".parse::<Regex<char>>().unwrap().normalize(), Alt(vec!['a'], vec![]));
+    assert_eq!(
+        "\\x".parse::<Regex<char>>().unwrap().normalize(),
+        Alt(vec!['\x00'], vec![])
+    );
+    assert_eq!(
+        "\\xc".parse::<Regex<char>>().unwrap().normalize(),
+        Alt(vec!['\x0c'], vec![])
+    );
+    assert_eq!(
+        "\\x0C".parse::<Regex<char>>().unwrap().normalize(),
+        Alt(vec!['\x0c'], vec![])
+    );
+    assert_eq!(
+        "\\xFF".parse::<Regex<char>>().unwrap().normalize(),
+        Alt(vec!['\u{00ff}'], vec![])
+    );
+    assert_eq!(
+        "\\x123".parse::<Regex<char>>().unwrap().normalize(),
+        Cat(vec![Alt(vec!['\x12'], vec![]),
+                 Alt(vec!['3'], vec![])]
+    ));
     assert_eq!("abc".parse::<Regex<char>>().unwrap().normalize(),
         Cat(vec![Alt(vec!['a'], vec![]),
                  Alt(vec!['b'], vec![]),
