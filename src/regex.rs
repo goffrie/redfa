@@ -217,6 +217,30 @@ impl<I: Iterator<Item=char>> Parser<I> {
                     Some('r') => Ok('\r'),
                     Some('n') => Ok('\n'),
                     Some('t') => Ok('\t'),
+                    Some('f') => Ok('\x0c'),
+                    Some('x') => {
+                        macro_rules! follow_num {
+                            () => {
+                                match self.it.peek() {
+                                    Some(c) => c.to_digit(16),
+                                    _ => None
+                                }
+                            }
+                        }
+                        match follow_num!() {
+                            Some(n1) => {
+                                self.it.next();
+                                match follow_num!() {
+                                    Some(n2) => {
+                                        self.it.next();
+                                        Ok(char::from_u32(n1 * 16 + n2).unwrap())
+                                    },
+                                    None => Ok(char::from_u32(n1).unwrap()),
+                                }
+                            }
+                            None => Ok('\x00')
+                        }
+                    },
                     Some(c) => Ok(c),
                     None => Err(ParseError::UnexpectedEof("unfollowed '\\'"))
                 }
