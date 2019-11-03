@@ -266,13 +266,13 @@ impl<I: Iterator<Item=char>> Parser<I> {
         loop {
             match self.it.peek() {
                 Some(&c) if Parser::<I>::char_group(c) => {
-                    let c = try!(self.char());
+                    let c = self.char()?;
                     if let Some(&'-') = self.it.peek() {
                         self.it.next();
                         if let None = self.it.peek() {
                             return Err(ParseError::UnexpectedEof("unterminated range"));
                         }
-                        let d = try!(self.char());
+                        let d = self.char()?;
                         // FIXME: This should be an inclusive range.
                         for x in (c as u64)..(d as u64 + 1) {
                             if let Some(x) = char::from_u32(x as u32) {
@@ -296,7 +296,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
         match self.it.peek() {
             Some(&'(') => {
                 self.it.next();
-                let r = try!(self.alt());
+                let r = self.alt()?;
                 match self.it.next() {
                     Some(')') => Ok(r),
                     Some(c) => Err(ParseError::UnexpectedChar("unexpected character", c)),
@@ -311,7 +311,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
                 } else {
                     false
                 };
-                let r = try!(self.chars());
+                let r = self.chars()?;
                 match self.it.next() {
                     Some(']') => Ok(if except {
                         Except(r)
@@ -326,7 +326,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
                 self.it.next();
                 Ok(Except(Vec::new()))
             }
-            Some(_) => Ok(Alt(vec![try!(self.char())], Vec::new())),
+            Some(_) => Ok(Alt(vec![self.char()?], Vec::new())),
             None => panic!("atom not nullable"),
         }
     }
@@ -334,7 +334,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
         c == '(' || c == '[' || c == '.' || Parser::<I>::char_first(c)
     }
     fn kleene(&mut self) -> Res<Regex<char>> {
-        let mut r = try!(self.atom());
+        let mut r = self.atom()?;
         loop {
             match self.it.peek() {
                 Some(&'*') => {
@@ -357,7 +357,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
         let mut r = Vec::new();
         loop {
             match self.it.peek() {
-                Some(&c) if Parser::<I>::kleene_first(c) => r.push(try!(self.kleene())),
+                Some(&c) if Parser::<I>::kleene_first(c) => r.push(self.kleene()?),
                 _ => break,
             }
         }
@@ -367,18 +367,18 @@ impl<I: Iterator<Item=char>> Parser<I> {
         match self.it.peek() {
             Some(&'~') => {
                 self.it.next();
-                Ok(Not(Box::new(try!(self.not()))))
+                Ok(Not(Box::new(self.not()?)))
             }
             _ => self.cat()
         }
     }
     fn and(&mut self) -> Res<Regex<char>> {
-        let mut r = vec![try!(self.not())];
+        let mut r = vec![self.not()?];
         loop {
             match self.it.peek() {
                 Some(&'&') => {
                     self.it.next();
-                    r.push(try!(self.not()));
+                    r.push(self.not()?);
                 }
                 _ => break,
             }
@@ -386,12 +386,12 @@ impl<I: Iterator<Item=char>> Parser<I> {
         Ok(And(r))
     }
     fn alt(&mut self) -> Res<Regex<char>> {
-        let mut r = vec![try!(self.and())];
+        let mut r = vec![self.and()?];
         loop {
             match self.it.peek() {
                 Some(&'|') => {
                     self.it.next();
-                    r.push(try!(self.and()));
+                    r.push(self.and()?);
                 }
                 _ => break,
             }
@@ -400,7 +400,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
     }
     fn parse(it: I) -> Res<Regex<char>> {
         let mut parser = Parser { it: it.peekable() };
-        let r = try!(parser.alt());
+        let r = parser.alt()?;
         if let Some(c) = parser.it.next() {
             Err(ParseError::UnexpectedChar("bad character in regex", c))
         } else {
