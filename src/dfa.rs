@@ -1,7 +1,7 @@
+use bit_set::BitSet;
 use derivatives::Differentiable;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use vec_map::VecMap;
-use bit_set::BitSet;
 
 /// A state in a DFA.
 #[derive(Debug, Clone)]
@@ -39,11 +39,17 @@ impl<T, V> Dfa<T, V> {
     /// The elements of `initial` form the first states of the DFA.
     /// Returns the DFA, together with a mapping from derivatives to state numbers.
     pub fn from_derivatives(initial: Vec<V>) -> (Dfa<T, V>, BTreeMap<V, u32>)
-        where T: Ord,
-              V: Differentiable<T> + Normalize + Ord + Clone {
-        fn index<V: Ord + Clone>(&mut (ref mut indices, ref mut next): &mut (BTreeMap<V, u32>, VecDeque<V>), re: V) -> u32 {
+    where
+        T: Ord,
+        V: Differentiable<T> + Normalize + Ord + Clone,
+    {
+        fn index<V: Ord + Clone>(
+            &mut (ref mut indices, ref mut next): &mut (BTreeMap<V, u32>, VecDeque<V>),
+            re: V,
+        ) -> u32 {
             let next_index = indices.len() as u32;
-            *indices.entry(re.clone()) // FIXME: unnecessary allocation
+            *indices
+                .entry(re.clone()) // FIXME: unnecessary allocation
                 .or_insert_with(|| {
                     next.push_back(re);
                     next_index
@@ -82,29 +88,43 @@ impl<T, V> Dfa<T, V> {
 
     /// Apply a function to each state's value.
     pub fn map<U, F>(self, mut f: F) -> Dfa<T, U>
-        where F: FnMut(V) -> U {
+    where
+        F: FnMut(V) -> U,
+    {
         Dfa {
-            states: self.states.into_iter().map(|state| State {
-                by_char: state.by_char,
-                default: state.default,
-                value: f(state.value),
-            }).collect()
+            states: self
+                .states
+                .into_iter()
+                .map(|state| State {
+                    by_char: state.by_char,
+                    default: state.default,
+                    value: f(state.value),
+                })
+                .collect(),
         }
     }
 
     /// Find the reverse transitions from each state in the DFA.
-    pub fn reverse(&self) -> Vec<(BTreeMap<&T, BTreeSet<usize> >, BTreeSet<usize>)>
-        where T: Ord {
+    pub fn reverse(&self) -> Vec<(BTreeMap<&T, BTreeSet<u32>>, BTreeSet<u32>)>
+    where
+        T: Ord,
+    {
         let mut result = vec![(BTreeMap::new(), BTreeSet::new()); self.states.len()];
         for (state_ix, state) in self.states.iter().enumerate() {
-            let mut rev: BTreeMap<usize, BTreeSet<_>> = BTreeMap::new();
+            let state_ix = state_ix as u32;
+            let mut rev: BTreeMap<u32, BTreeSet<_>> = BTreeMap::new();
             for (by, &to) in &state.by_char {
-                rev.entry(to as usize).or_insert_with(BTreeSet::new).insert(by);
+                rev.entry(to)
+                    .or_insert_with(BTreeSet::new)
+                    .insert(by);
             }
             for (&to, by) in &rev {
                 for what in by {
-                    let &mut (ref mut trans, ref default) = &mut result[to];
-                    trans.entry(*what).or_insert_with(|| default.clone()).insert(state_ix);
+                    let (trans, default) = &mut result[to as usize];
+                    trans
+                        .entry(*what)
+                        .or_insert_with(|| default.clone())
+                        .insert(state_ix);
                 }
             }
             // `state.default` means that, for all characters NOT in
@@ -132,13 +152,15 @@ impl<T, V> Dfa<T, V> {
     /// Two DFAs are equivalent if, given the same string, they always lead to a
     /// state with the same associated value.
     pub fn minimize(&self) -> Dfa<T, &V>
-        where T: Ord + Clone, V: Ord {
-
+    where
+        T: Ord + Clone,
+        V: Ord,
+    {
         assert!(!self.states.is_empty());
 
         // `partitions` is a partition of the DFA states, representing the
         // current set of equivalence classes
-        let mut partitions: Vec<BTreeSet<usize>> = vec![];
+        let mut partitions: Vec<BTreeSet<u32>> = vec![];
         {
             // Calculate the initial partition. The choice of initial partition
             // determines what states the algorithm considers distinguishable.
@@ -150,18 +172,20 @@ impl<T, V> Dfa<T, V> {
             worklist.push_back(0);
             seen.insert(0);
             while let Some(state_ix) = worklist.pop_front() {
-                let state = &self.states[state_ix];
-                let part = *initial_partition.entry(&state.value)
-                    .or_insert_with(|| {
-                        let ix = partitions.len();
-                        partitions.push(BTreeSet::new());
-                        ix
-                    });
+                let state = &self.states[state_ix as usize];
+                let part = *initial_partition.entry(&state.value).or_insert_with(|| {
+                    let ix = partitions.len();
+                    partitions.push(BTreeSet::new());
+                    ix
+                });
                 partitions[part].insert(state_ix);
-                for &next in state.by_char.values()
-                    .chain(Some(&state.default).into_iter()) {
+                for &next in state
+                    .by_char
+                    .values()
+                    .chain(Some(&state.default).into_iter())
+                {
                     if seen.insert(next as usize) {
-                        worklist.push_back(next as usize);
+                        worklist.push_back(next);
                     }
                 }
             }
@@ -174,20 +198,23 @@ impl<T, V> Dfa<T, V> {
         while let Some(&cur_ix) = worklist.iter().next() {
             // XXX: I wish there were a way to just grab the first element...
             worklist.remove(&cur_ix);
-            let chars: BTreeSet<&T> = partitions[cur_ix].iter().flat_map(|&state| preimages[state].0.keys().cloned()).collect();
+            let chars: BTreeSet<&T> = partitions[cur_ix]
+                .iter()
+                .flat_map(|&state| preimages[state as usize].0.keys().cloned())
+                .collect();
             for c in chars.into_iter().map(Some).chain(Some(None).into_iter()) {
                 let mut l = BTreeSet::new();
                 if let Some(c) = c {
                     for &state in &partitions[cur_ix] {
-                        if let Some(prevs) = preimages[state].0.get(c) {
+                        if let Some(prevs) = preimages[state as usize].0.get(c) {
                             l.extend(prevs.iter().cloned());
                         } else {
-                            l.extend(preimages[state].1.iter().cloned());
+                            l.extend(preimages[state as usize].1.iter().cloned());
                         }
                     }
                 } else {
                     for &state in &partitions[cur_ix] {
-                        l.extend(preimages[state].1.iter().cloned());
+                        l.extend(preimages[state as usize].1.iter().cloned());
                     }
                 }
                 let l = l;
@@ -201,11 +228,7 @@ impl<T, V> Dfa<T, V> {
                         continue;
                     }
                     // make sure that the starting state (#0) stays where it is
-                    let (r1, r2) = if r2.contains(&0) {
-                        (r2, r1)
-                    } else {
-                        (r1, r2)
-                    };
+                    let (r1, r2) = if r2.contains(&0) { (r2, r1) } else { (r1, r2) };
                     // partitions[part_ix] = r1, partitions[new_ix] = r2
                     let new_ix = partitions.len();
                     // first update the worklist
@@ -232,34 +255,53 @@ impl<T, V> Dfa<T, V> {
         // starting state.
         debug_assert!(partitions[0].contains(&0));
 
-        let partition: BTreeMap<usize, u32> = partitions.iter().enumerate()
-            .flat_map(|(part_ix, part)| part.iter()
-                      .map(move |&state_ix| (state_ix, part_ix as u32)))
+        let partition: BTreeMap<u32, u32> = partitions
+            .iter()
+            .enumerate()
+            .flat_map(|(part_ix, part)| {
+                part.iter().map(move |&state_ix| (state_ix, part_ix as u32))
+            })
             .collect();
 
-        let states: Vec<_> = partitions.iter().map(|part| {
-            let state_ix = *part.iter().next().unwrap();
-            let state = &self.states[state_ix];
-            let default = partition[&(state.default as usize)];
-            State {
-                by_char: state.by_char.iter()
-                    .map(|(key, &to)| (key.clone(), partition[&(to as usize)]))
-                    .filter(|&(_, to)| to != default)
-                    .collect(),
-                default: default,
-                value: &state.value,
-            }
-        }).collect();
+        let states: Vec<_> = partitions
+            .iter()
+            .map(|part| {
+                let state_ix = *part.iter().next().unwrap();
+                let state = &self.states[state_ix as usize];
+                let default = partition[&state.default];
+                State {
+                    by_char: state
+                        .by_char
+                        .iter()
+                        .map(|(key, &to)| (key.clone(), partition[&to]))
+                        .filter(|&(_, to)| to != default)
+                        .collect(),
+                    default: default,
+                    value: &state.value,
+                }
+            })
+            .collect();
 
         // Sanity check: the partitions should really be valid.
-        debug_assert!(partitions.iter().zip(states.iter()).all(|(part, new_state)| {
-            part.iter().all(|&state_ix| {
-                let state = &self.states[state_ix];
-                state.by_char.iter().all(|(key, &to)| partition[&(to as usize)] == new_state.by_char.get(key).cloned().unwrap_or(new_state.default))
-                    && partition[&(state.default as usize)] == new_state.default
-                    && state.value == *new_state.value
-            })
-        }));
+        if cfg!(debug_assertions) {
+            for (part, new_state) in partitions.iter().zip(&states) {
+                for &state_ix in part {
+                    let state = &self.states[state_ix as usize];
+                    for (key, &to) in &state.by_char {
+                        assert_eq!(
+                            partition[&to],
+                            new_state
+                                .by_char
+                                .get(key)
+                                .copied()
+                                .unwrap_or(new_state.default)
+                        );
+                    }
+                    assert!(partition[&state.default] == new_state.default);
+                    assert!(state.value == *new_state.value);
+                }
+            }
+        }
 
         Dfa { states: states }
     }
@@ -308,15 +350,16 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
         return true;
     }
 }
-impl<T: Ord, V: Eq> Eq for Dfa<T, V> {
-}
+impl<T: Ord, V: Eq> Eq for Dfa<T, V> {}
 
 impl<T, V> Dfa<T, V> {
     /// Compare DFAs by language equality.
     pub fn equiv<U>(&self, other: &Dfa<T, U>) -> bool
-        where T: Ord + Clone,
-              U: Ord,
-              V: Ord + PartialEq<U> {
+    where
+        T: Ord + Clone,
+        U: Ord,
+        V: Ord + PartialEq<U>,
+    {
         return self.minimize() == other.minimize();
     }
 }
