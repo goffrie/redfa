@@ -55,6 +55,8 @@ fn test_regex_parse() {
         Not(Box::new(Alt(vec!['a'], vec![]))));
     assert_eq!("~b*".parse::<Regex<char>>().unwrap().normalize(),
         Not(Box::new(Kleene(Box::new(Alt(vec!['b'], vec![]))))));
+    assert_eq!("~b?c".parse::<Regex<char>>().unwrap().normalize(),
+               Not(Box::new(Cat(vec![Alt(vec!['b'], vec![Empty]), Alt(vec!['c'], vec![])]))));
     assert_eq!("a&b*".parse::<Regex<char>>().unwrap().normalize(),
         And(vec![Alt(vec!['a'], vec![]), Kleene(Box::new(Alt(vec!['b'], vec![])))]));
     assert_eq!("(a|b)&([cd]|d)*".parse::<Regex<char>>().unwrap().normalize(),
@@ -77,6 +79,7 @@ fn test_regex_parse_error() {
     assert!("[asdf".parse::<Regex<char>>().is_err());
     assert!("[a-z".parse::<Regex<char>>().is_err());
     assert!("&*".parse::<Regex<char>>().is_err());
+    assert!("(?)".parse::<Regex<char>>().is_err());
     assert!("|*".parse::<Regex<char>>().is_err());
     assert!("(".parse::<Regex<char>>().is_err());
     assert!("(()".parse::<Regex<char>>().is_err());
@@ -206,7 +209,8 @@ fn test_regex_to_dfa() {
     });
     assert_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&b*)"));
     assert_not_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&a*)"));
-    assert_equiv!(to_dfa("~a"), to_dfa("|[^a]|...*"));
+    assert_equiv!(to_dfa("~a"), to_dfa("|[^a]|..+"));
     assert_not_equiv!(to_dfa("~a"), to_dfa("[^a]"));
     assert_equiv!(to_dfa("(a.*b)&(.[b-d]*.)&(.*c..)"), to_dfa("a[b-d]*c[b-d]b"));
+    assert_equiv!(to_dfa("a[bc]+d?"), to_dfa("a(b|c)[bc]*(|d)"));
 }

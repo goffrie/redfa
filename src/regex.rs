@@ -181,6 +181,7 @@ Atom : Char
 Kleene : Atom
        : Kleene '*'
        : Kleene '+'
+       : Kleene '?'
 Cat : Kleene
     : Kleene Cat
 Not : Cat
@@ -252,11 +253,7 @@ impl<I: Iterator<Item=char>> Parser<I> {
         }
     }
     fn char_first(c: char) -> bool {
-        c != '~' && c != '|' && c != '&'
-            && c != '[' && c != ']'
-            && c != '(' && c != ')'
-            && c != '*' && c != '+'
-            && c != '~' && c != '.'
+        !['~','|','&','[',']','(',')','*','+','~','.','?'].contains(&c)
     }
     fn char_group(c: char) -> bool {
         c != ']'
@@ -344,6 +341,10 @@ impl<I: Iterator<Item=char>> Parser<I> {
                 Some(&'+') => {
                     self.it.next();
                     r = Cat(vec![r.clone(), Kleene(Box::new(r))])
+                }
+                Some(&'?') => {
+                    self.it.next();
+                    r = Alt(vec![], vec![Empty, r])
                 }
                 _ => break,
             }
