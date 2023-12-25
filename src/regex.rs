@@ -40,7 +40,7 @@ impl<A, It: Iterator<Item = A>> Pull<A> for It {
     fn pull<B, Fun: FnMut(A) -> Result<Vec<A>, B>>(self, f: Fun) -> Puller<A, B, Fun, Self> {
         Puller {
             s: self,
-            f: f,
+            f,
             cur: Vec::new(),
         }
     }
@@ -170,7 +170,7 @@ impl<T: Ord> Normalize for Regex<T> {
                 Kleene(y) => Kleene(y),
                 Null => Empty,
                 Empty => Empty,
-                Except(ref chs) if chs.len() == 0 => not_null,
+                Except(ref chs) if chs.is_empty() => not_null,
                 y => Kleene(Box::new(y)),
             },
         }
@@ -269,7 +269,7 @@ impl<I: Iterator<Item = char>> Parser<I> {
                     let c = self.char()?;
                     if let Some(&'-') = self.it.peek() {
                         self.it.next();
-                        if let None = self.it.peek() {
+                        if self.it.peek().is_none() {
                             return Err(ParseError::UnexpectedEof("unterminated range"));
                         }
                         let d = self.char()?;
@@ -385,27 +385,17 @@ impl<I: Iterator<Item = char>> Parser<I> {
     }
     fn and(&mut self) -> Res<Regex<char>> {
         let mut r = vec![self.not()?];
-        loop {
-            match self.it.peek() {
-                Some(&'&') => {
-                    self.it.next();
-                    r.push(self.not()?);
-                }
-                _ => break,
-            }
+        while let Some(&'&') = self.it.peek() {
+            self.it.next();
+            r.push(self.not()?);
         }
         Ok(And(r))
     }
     fn alt(&mut self) -> Res<Regex<char>> {
         let mut r = vec![self.and()?];
-        loop {
-            match self.it.peek() {
-                Some(&'|') => {
-                    self.it.next();
-                    r.push(self.and()?);
-                }
-                _ => break,
-            }
+        while let Some(&'|') = self.it.peek() {
+            self.it.next();
+            r.push(self.and()?);
         }
         Ok(Alt(Vec::new(), r))
     }

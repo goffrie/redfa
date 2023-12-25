@@ -1,5 +1,5 @@
-use bit_set::BitSet;
 use crate::derivatives::Differentiable;
+use bit_set::BitSet;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use vec_map::VecMap;
 
@@ -77,8 +77,8 @@ impl<T, V> Dfa<T, V> {
                 }
             }
             result.states.push(State {
-                by_char: by_char,
-                default: default,
+                by_char,
+                default,
                 value: re,
             });
         }
@@ -105,6 +105,7 @@ impl<T, V> Dfa<T, V> {
     }
 
     /// Find the reverse transitions from each state in the DFA.
+    #[allow(clippy::type_complexity)]
     pub fn reverse(&self) -> Vec<(BTreeMap<&T, BTreeSet<u32>>, BTreeSet<u32>)>
     where
         T: Ord,
@@ -274,7 +275,7 @@ impl<T, V> Dfa<T, V> {
                         .map(|(key, &to)| (key.clone(), partition[&to]))
                         .filter(|&(_, to)| to != default)
                         .collect(),
-                    default: default,
+                    default,
                     value: &state.value,
                 }
             })
@@ -301,7 +302,7 @@ impl<T, V> Dfa<T, V> {
             }
         }
 
-        Dfa { states: states }
+        Dfa { states }
     }
 }
 
@@ -345,7 +346,7 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
                 worklist.push_back(a.default);
             }
         }
-        return true;
+        true
     }
 }
 impl<T: Ord, V: Eq> Eq for Dfa<T, V> {}

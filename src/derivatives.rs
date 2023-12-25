@@ -1,7 +1,7 @@
-use std::cmp::Ordering;
-use std::iter::Peekable;
 use crate::Regex;
 use crate::Regex::*;
+use std::cmp::Ordering;
+use std::iter::Peekable;
 
 /// The set of some object's derivatives with respect to an alphabet `T`.
 #[derive(Debug, Clone)]
@@ -181,13 +181,13 @@ fn combine<T: Ord + Clone, R, S, F: FnMut(&[&R]) -> S>(
         out: &mut (Vec<(Vec<T>, S)>, Option<S>),
     ) {
         if let Set::Just(ref v) = what {
-            if v.len() == 0 {
+            if v.is_empty() {
                 // prune
                 return;
             }
         }
-        if v.len() == 0 {
-            let reg = f(&current);
+        if v.is_empty() {
+            let reg = f(current);
             match what {
                 Set::Just(c) => out.0.push((c, reg)),
                 Set::Not(_) => {
@@ -200,9 +200,9 @@ fn combine<T: Ord + Clone, R, S, F: FnMut(&[&R]) -> S>(
         let (first, rest) = v.split_at(1);
         let first = &first[0];
         let mut all_chars = Vec::new();
-        for &(ref chars, ref reg) in first.d.iter() {
+        for (chars, reg) in first.d.iter() {
             all_chars = union(all_chars.into_iter(), chars.iter().cloned()).collect();
-            let inter = what.inter(&chars);
+            let inter = what.inter(chars);
             current.push(reg);
             go(rest, f, inter, current, out);
             current.pop();
@@ -233,7 +233,7 @@ impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
                 rest: Null,
             },
             Except(ref cs) => {
-                if cs.len() == 0 {
+                if cs.is_empty() {
                     Derivatives {
                         d: Vec::new(),
                         rest: Empty,
@@ -246,8 +246,8 @@ impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
                 }
             }
             Alt(ref cs, ref xs) => {
-                let mut ds = Vec::with_capacity(if cs.len() > 0 { 1 } else { 0 } + xs.len());
-                if cs.len() > 0 {
+                let mut ds = Vec::with_capacity(if !cs.is_empty() { 1 } else { 0 } + xs.len());
+                if !cs.is_empty() {
                     ds.push(Derivatives {
                         d: vec![(cs.clone(), Empty)],
                         rest: Null,
@@ -290,6 +290,6 @@ impl<T: Ord + Clone> Differentiable<T> for Regex<T> {
 impl<T: Ord + Clone, R: Differentiable<T> + Clone> Differentiable<T> for Vec<R> {
     fn derivative(&self) -> Derivatives<T, Vec<R>> {
         let v: Vec<Derivatives<T, R>> = self.iter().map(Differentiable::derivative).collect();
-        combine(&*v, |xs: &[&R]| xs.iter().map(|&x| x.clone()).collect())
+        combine(&v, |xs: &[&R]| xs.iter().map(|&x| x.clone()).collect())
     }
 }
