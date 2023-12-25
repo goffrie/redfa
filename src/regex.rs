@@ -1,5 +1,5 @@
 use self::Regex::*;
-use dfa::Normalize;
+use crate::dfa::Normalize;
 use std::collections::BTreeSet;
 use std::iter::Peekable;
 use std::{char, fmt, str, vec};

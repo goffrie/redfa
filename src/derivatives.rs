@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::iter::Peekable;
-use Regex;
-use Regex::*;
+use crate::Regex;
+use crate::Regex::*;
 
 /// The set of some object's derivatives with respect to an alphabet `T`.
 #[derive(Debug, Clone)]

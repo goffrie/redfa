@@ -1,7 +1,7 @@
 [package]
-
 name = "redfa"
 version = "0.0.2"
+edition = "2021"
 authors = ["Geoffry Song <goffrie@gmail.com>"]
 
 description = "Regular expression derivatives for creating DFAs."
@@ -11,10 +11,6 @@ repository = "https://github.com/goffrie/redfa"
 documentation = "http://goffrie.github.io/redfa"
 license = "MIT OR Apache-2.0"
 keywords = ["regex", "dfa"]
-
-[lib]
-
-name = "redfa"
 
 [dependencies]
 vec_map = "0.8.0"

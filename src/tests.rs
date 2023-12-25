@@ -1,6 +1,6 @@
-use dfa::*;
-use regex::Regex::*;
-use regex::*;
+use crate::dfa::*;
+use crate::regex::Regex::*;
+use crate::regex::*;
 use std::collections::BTreeMap;
 
 #[test]

@@ -1,5 +1,5 @@
 use bit_set::BitSet;
-use derivatives::Differentiable;
+use crate::derivatives::Differentiable;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use vec_map::VecMap;
 
