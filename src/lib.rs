@@ -1,6 +1,3 @@
-extern crate bit_set;
-extern crate vec_map;
-
 pub use crate::dfa::{Dfa, State};
 pub use crate::regex::Regex;
 pub mod derivatives;

@@ -1,5 +1,3 @@
-#![crate_type = "bin"]
-extern crate redfa;
 use redfa::derivatives::Differentiable;
 use redfa::dfa::Normalize;
 use redfa::*;
