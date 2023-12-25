@@ -1,9 +1,10 @@
-extern crate vec_map;
 extern crate bit_set;
+extern crate vec_map;
 
+pub use dfa::{Dfa, State};
 pub use regex::Regex;
-pub use dfa::{State, Dfa};
-pub mod regex;
 pub mod derivatives;
 pub mod dfa;
-#[cfg(test)] mod tests;
+pub mod regex;
+#[cfg(test)]
+mod tests;

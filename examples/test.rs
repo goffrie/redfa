@@ -1,8 +1,8 @@
-#![crate_type="bin"]
+#![crate_type = "bin"]
 extern crate redfa;
-use redfa::*;
 use redfa::derivatives::Differentiable;
 use redfa::dfa::Normalize;
+use redfa::*;
 use std::io::BufRead;
 fn main() {
     let stdin = std::io::stdin();

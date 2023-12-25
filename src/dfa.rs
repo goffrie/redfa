@@ -114,9 +114,7 @@ impl<T, V> Dfa<T, V> {
             let state_ix = state_ix as u32;
             let mut rev: BTreeMap<u32, BTreeSet<_>> = BTreeMap::new();
             for (by, &to) in &state.by_char {
-                rev.entry(to)
-                    .or_insert_with(BTreeSet::new)
-                    .insert(by);
+                rev.entry(to).or_insert_with(BTreeSet::new).insert(by);
             }
             for (&to, by) in &rev {
                 for what in by {
