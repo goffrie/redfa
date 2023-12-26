@@ -1,6 +1,7 @@
 use crate::derivatives::Differentiable;
 use bit_set::BitSet;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::iter;
 use vec_map::VecMap;
 
 /// A state in a DFA.
@@ -178,11 +179,7 @@ impl<T, V> Dfa<T, V> {
                     ix
                 });
                 partitions[part].insert(state_ix);
-                for &next in state
-                    .by_char
-                    .values()
-                    .chain(Some(&state.default).into_iter())
-                {
+                for &next in state.by_char.values().chain(iter::once(&state.default)) {
                     if seen.insert(next as usize) {
                         worklist.push_back(next);
                     }
@@ -197,32 +194,33 @@ impl<T, V> Dfa<T, V> {
         while let Some(&cur_ix) = worklist.iter().next() {
             // XXX: I wish there were a way to just grab the first element...
             worklist.remove(&cur_ix);
-            let chars: BTreeSet<&T> = partitions[cur_ix]
+            let part = partitions[cur_ix].clone();
+            let chars: BTreeSet<&T> = part
                 .iter()
-                .flat_map(|&state| preimages[state as usize].0.keys().cloned())
+                .flat_map(|&state| preimages[state as usize].0.keys().copied())
                 .collect();
-            for c in chars.into_iter().map(Some).chain(Some(None).into_iter()) {
+            for c in chars.into_iter().map(Some).chain(iter::once(None)) {
                 let mut l = BTreeSet::new();
                 if let Some(c) = c {
-                    for &state in &partitions[cur_ix] {
+                    for &state in &part {
                         if let Some(prevs) = preimages[state as usize].0.get(c) {
-                            l.extend(prevs.iter().cloned());
+                            l.extend(prevs.iter().copied());
                         } else {
-                            l.extend(preimages[state as usize].1.iter().cloned());
+                            l.extend(preimages[state as usize].1.iter().copied());
                         }
                     }
                 } else {
-                    for &state in &partitions[cur_ix] {
-                        l.extend(preimages[state as usize].1.iter().cloned());
+                    for &state in &part {
+                        l.extend(preimages[state as usize].1.iter().copied());
                     }
                 }
                 let l = l;
                 for part_ix in 0..partitions.len() {
-                    let r1: BTreeSet<_> = partitions[part_ix].intersection(&l).cloned().collect();
+                    let r1: BTreeSet<_> = partitions[part_ix].intersection(&l).copied().collect();
                     if r1.is_empty() {
                         continue;
                     }
-                    let r2: BTreeSet<_> = partitions[part_ix].difference(&r1).cloned().collect();
+                    let r2: BTreeSet<_> = partitions[part_ix].difference(&r1).copied().collect();
                     if r2.is_empty() {
                         continue;
                     }
@@ -236,7 +234,7 @@ impl<T, V> Dfa<T, V> {
                         // both halves
                         worklist.insert(new_ix);
                     } else {
-                        // otherwise, we need to add one half to the worklist
+                        // otherwise, we need to add one half to the worklist; pick the smaller one
                         if r1.len() <= r2.len() {
                             worklist.insert(part_ix);
                         } else {
@@ -359,6 +357,6 @@ impl<T, V> Dfa<T, V> {
         U: Ord,
         V: Ord + PartialEq<U>,
     {
-        return self.minimize() == other.minimize();
+        self.minimize() == other.minimize()
     }
 }

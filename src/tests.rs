@@ -296,6 +296,18 @@ fn test_regex_to_dfa() {
         3, 'a', 1;
         3, 'b', 2;
     });
+    assert_equiv!(
+        to_dfa("(a(cb)*)?b"),
+        dfa! {
+            4;
+            0, 'a', 1;
+            1, 'c', 2;
+            2, 'b', 1;
+            0, 'b', 3;
+            1, 'b', 3;
+            3;
+        }
+    );
     assert_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&b*)"));
     assert_not_equiv!(to_dfa("a*b"), to_dfa("(a|a*(a*)*)(b&a*)"));
     assert_equiv!(to_dfa("~a"), to_dfa("|[^a]|..+"));
