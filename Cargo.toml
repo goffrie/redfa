@@ -13,5 +13,4 @@ license = "MIT OR Apache-2.0"
 keywords = ["regex", "dfa"]
 
 [dependencies]
-vec_map = "0.8.0"
 bit-set = "0.5.0"

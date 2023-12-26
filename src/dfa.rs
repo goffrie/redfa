@@ -2,7 +2,6 @@ use crate::derivatives::Differentiable;
 use bit_set::BitSet;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::iter;
-use vec_map::VecMap;
 
 /// A state in a DFA.
 #[derive(Debug, Clone)]
@@ -310,12 +309,12 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
         if self.states.len() != other.states.len() {
             return false;
         }
-        let mut mapping = VecMap::with_capacity(self.states.len());
+        let mut mapping = vec![None; self.states.len()];
         let mut worklist = VecDeque::new();
-        mapping.insert(0, 0);
+        mapping[0] = Some(0);
         worklist.push_back(0);
         while let Some(ix) = worklist.pop_front() {
-            let other_ix = mapping[ix as usize];
+            let other_ix = mapping[ix as usize].expect("worklist only contains populated entries");
             let a = &self.states[ix as usize];
             let b = &other.states[other_ix as usize];
             if a.by_char.len() != b.by_char.len() {
@@ -323,7 +322,7 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
             }
             for (c, &to) in &a.by_char {
                 if let Some(&other_to) = b.by_char.get(c) {
-                    if let Some(old_mapping) = mapping.insert(to as usize, other_to) {
+                    if let Some(old_mapping) = mapping[to as usize].replace(other_to) {
                         // make sure the replaced element was the same
                         if old_mapping != other_to {
                             return false;
@@ -336,7 +335,7 @@ impl<T: Ord, U, V: PartialEq<U>> PartialEq<Dfa<T, U>> for Dfa<T, V> {
                     return false;
                 }
             }
-            if let Some(old_mapping) = mapping.insert(a.default as usize, b.default) {
+            if let Some(old_mapping) = mapping[a.default as usize].replace(b.default) {
                 if old_mapping != b.default {
                     return false;
                 }
